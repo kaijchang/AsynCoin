@@ -1,15 +1,22 @@
 # -*- coding: utf-8 -*-
 
 from sanic import Sanic, response
+import logging
 
-from json import loads
 import aiohttp
 import asyncio
+from aioconsole import ainput
+
+from json import loads
 import time
+import yaml
 
 from asyncoin.cryptocurrency.blockchain import Blockchain
 from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.transaction import Transaction
+from asyncoin.cryptocurrency.keys import KeyPair
+
+from asyncoin.utilities.encryption import decrypt, encrypt
 
 
 class Peers:
@@ -220,16 +227,39 @@ class Node(Sanic, Blockchain, Peers):
 
             n += 1
 
-    def run(self, genesis_address):
-        """Spin up a blockchain and start the Sanic server.
-        Args:
-            genesis_address (str): address to mine the genesis block.
-        """
-        Blockchain.__init__(self, genesis_address=genesis_address)
+    async def interface(self):
+        """Asynchronous user input task."""
+        logging.getLogger('root').setLevel('CRITICAL')
+        logging.getLogger('sanic.error').setLevel('CRITICAL')
+        logging.getLogger('sanic.access').setLevel('CRITICAL')
+
+        while True:
+            cmd = await ainput('(NODE) > ')
+
+    def run(self):
+        """Spin up a blockchain and start the Sanic server."""
+        with open('./asyncoin/config/keys.yaml') as key_file:
+            enc_private = yaml.load(key_file.read())['encrypted_private']
+            if enc_private:
+                pass_ = input('Enter your Passphrase > ')
+                keys = KeyPair(decrypt(pass_.encode(), enc_private).decode())
+
+            else:
+                keys = KeyPair()
+
+        Blockchain.__init__(self, genesis_address=keys.address)
+
+        print(
+            """
+Started Blockchain with Pair:
+Address: {0}
+Private Key: {1}
+""".format(keys.address, keys.hexprivate))
 
         loop = asyncio.get_event_loop()
 
-        loop.create_task(self.mine(genesis_address))
+        self.add_task(self.interface())
+
         loop.create_task(Sanic.create_server(self))
 
         loop.run_forever()
