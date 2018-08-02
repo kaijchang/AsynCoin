@@ -1,0 +1,4 @@
+PyYAML == 3.12
+aiohttp == 3.3.2
+ecdsa == 0.13
+sanic == 0.7.0
