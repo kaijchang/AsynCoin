@@ -5,6 +5,7 @@ from sanic import Sanic, response
 from json import loads
 import aiohttp
 import asyncio
+import time
 
 from asyncoin.cryptocurrency.blockchain import Blockchain
 from asyncoin.cryptocurrency.block import Block
@@ -198,10 +199,37 @@ class Node(Sanic, Blockchain, Peers):
         def height(request):
             return response.text(str(self.height))
 
+    async def mine(self, reward_address, lowest_fee=1):
+        """Asynchronous POW task."""
+        n = 0
+        while True:
+            await asyncio.sleep(0)
+
+            acceptable_transactions = [
+                transaction for transaction in self.pending if transaction.fee >= lowest_fee]
+            reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
+                transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
+
+            block = Block(index=self.height, nonce=n, data=[
+                          reward_transaction] + acceptable_transactions, previous_hash=self.last_block.hash, timestamp=time.time())
+
+            if block.hash.startswith(self.difficulty * '1'):
+                self.add_block(block)
+                await self.broadcast_block(block)
+                n = 0
+
+            n += 1
+
     def run(self, genesis_address):
         """Spin up a blockchain and start the Sanic server.
         Args:
             genesis_address (str): address to mine the genesis block.
         """
         Blockchain.__init__(self, genesis_address=genesis_address)
-        Sanic.run(self)
+
+        loop = asyncio.get_event_loop()
+
+        loop.create_task(self.mine(genesis_address))
+        loop.create_task(Sanic.create_server(self))
+
+        loop.run_forever()
