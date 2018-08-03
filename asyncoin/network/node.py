@@ -51,7 +51,7 @@ class Peers:
                     async with session.post('http://{}/transaction'.format(peer), data=repr(transaction)):
                         pass
 
-            except ConnectionRefusedError:
+            except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
 
     async def broadcast_block(self, block):
@@ -66,7 +66,7 @@ class Peers:
                     async with session.post('http://{}/block'.format(peer), data=repr(block)):
                         pass
 
-            except ConnectionRefusedError:
+            except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
 
     async def find_longest_chain(self):
@@ -83,7 +83,7 @@ class Peers:
                         height = await response.text()
                         heights.append(int(height))
 
-            except ConnectionRefusedError:
+            except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
 
         if heights:
@@ -94,7 +94,7 @@ class Peers:
 
                 return [Block(json_dict=block) for block in blocks]
 
-            except ConnectionRefusedError:
+            except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
 
         return []
@@ -233,8 +233,54 @@ class Node(Sanic, Blockchain, Peers):
         logging.getLogger('sanic.error').setLevel('CRITICAL')
         logging.getLogger('sanic.access').setLevel('CRITICAL')
 
+        loop = asyncio.get_event_loop()
+
         while True:
             cmd = await ainput('(NODE) > ')
+            cmd = cmd.lower().split()
+
+            if not cmd:
+                pass
+
+            elif cmd[0] == 'mine':
+                if len(cmd) > 1:
+                    if cmd[1] == 'stop':
+                        try:
+                            mining_task.cancel()
+                            del mining_task
+                            print('Stopped mining task.')
+
+                        except NameError:
+                            print('The node is not mining.')
+
+                    else:
+                        if 'mining_task' in locals():
+                            print('The node is already mining.')
+
+                        else:
+                            mining_task = loop.create_task(self.mine(cmd[1]))
+                            print('Started mining task.')
+
+                else:
+                    if 'mining_task' in locals():
+                        print('The node is already mining.')
+
+                    else:
+                        mining_task = loop.create_task(self.mine(self.address))
+                        print('Started mining task.')
+
+            elif cmd[0] == 'balance':
+                if len(cmd) > 1:
+                    print('Balance: {}'.format(self.get_balance(cmd[1])))
+
+                else:
+                    print('Balance: {}'.format(self.get_balance(self.address)))
+
+            elif cmd[0] == 'exit':
+                for task in asyncio.Task.all_tasks():
+                    task.cancel()
+
+                loop.stop()
 
     def run(self):
         """Spin up a blockchain and start the Sanic server."""
@@ -242,19 +288,29 @@ class Node(Sanic, Blockchain, Peers):
             enc_private = yaml.load(key_file.read())['encrypted_private']
             if enc_private:
                 pass_ = input('Enter your Passphrase > ')
-                keys = KeyPair(decrypt(pass_.encode(), enc_private).decode())
+                try:
+                    keys = KeyPair(
+                        decrypt(pass_.encode(), enc_private).decode())
+
+                except ValueError:
+                    raise ValueError('Unable to decrypt private key.')
 
             else:
+                print('No key found in config.yaml, generating new keys.')
+                pass_ = input('Enter a Passphrase > ')
                 keys = KeyPair()
+
+                print(
+                    """
+Encrypted Private Key: {0}
+Address: {1}
+""".format(encrypt(pass_.encode(), keys.hexprivate.encode()), keys.address))
 
         Blockchain.__init__(self, genesis_address=keys.address)
 
-        print(
-            """
-Started Blockchain with Pair:
-Address: {0}
-Private Key: {1}
-""".format(keys.address, keys.hexprivate))
+        print('Started Blockchain and Mined Genesis Block.')
+
+        self.address = keys.address
 
         loop = asyncio.get_event_loop()
 
