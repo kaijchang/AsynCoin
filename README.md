@@ -18,7 +18,7 @@ AsynCoin is a very in-progress build of a basic implementation of a cryptocurren
 
 ## Installation
 
-```console
+```bash
 $ git clone https://github.com/kajchang/asyncoin.git
 $ cd asyncoin
 $ pip install -r requirements.txt
@@ -27,7 +27,7 @@ $ pip install -r requirements.txt
 
 ## How to Run a Node
 
-```console
+```bash
 $ python3 run.py node
 No key found in config.yaml, generating new keys.
 Enter a Passphrase > passphrase_to_encrypt_key
@@ -45,21 +45,21 @@ You can copy and paste the encrypted private key to the `encrypted_private` fiel
 
 How to check address balances on your node:
 
-```console
+```bash
 (NODE) > balance (automatically uses the generated or loaded address)
 Balance: 50 (from genesis block reward)
 ```
 
 or
 
-```console
+```bash
 (NODE) > balance 028cad48898e7a79db3e0b1948a64cd470a6401dfbb53cd12ac377ac246d6dc961d1c64f9d01b89575a7e334682f8079
 Balance: 50
 ```
 
 How to mine on your node:
 
-```console
+```bash
 (NODE) > mine (automatically uses the generated or loaded address)
 Started mining task.
 (NODE) > balance
@@ -70,6 +70,6 @@ Stopped mining task.
 
 Exiting gracefully:
 
-```console
+```bash
 (NODE) > exit
 ```
