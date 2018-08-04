@@ -221,7 +221,11 @@ class Node(Sanic, Blockchain, Peers):
         async def subscription(request, websocket):
             self.block_subscribers.add(websocket)
             while True:
-                await websocket.recv()
+                try:
+                    await websocket.recv()
+
+                except ConnectionClosed:
+                    self.block_subscribers.remove(websocket)
 
     async def mine(self, reward_address, lowest_fee=1):
         """Asynchronous POW task."""
