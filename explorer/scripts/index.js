@@ -76,6 +76,6 @@ function connect(URL) {
 $(document).ready(function() {
     connect('127.0.0.1:8000');
     $('#node-uri').on('input', function() {
-        connect(this.val());
+        connect(this.value);
     });
 });
