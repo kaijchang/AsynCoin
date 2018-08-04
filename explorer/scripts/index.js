@@ -46,7 +46,6 @@ function connect(URL) {
                                       </tr>`);
                 $("time.timeago").timeago();
 
-                console.log($("#blocks").children().length);
                 if ($("#blocks").children().length > 10) {
                     $("#blocks").children().last().remove();
                 }
