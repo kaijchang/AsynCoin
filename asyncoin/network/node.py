@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from sanic import Sanic, response
-import logging
 
 import aiohttp
 import asyncio
@@ -10,6 +9,8 @@ from aioconsole import ainput
 from json import loads
 import time
 import yaml
+import logging
+from websockets.exceptions import ConnectionClosed
 
 from asyncoin.cryptocurrency.blockchain import Blockchain
 from asyncoin.cryptocurrency.block import Block
@@ -24,6 +25,7 @@ class Peers:
 
     def __init__(self):
         self.peers = set()
+        self.block_subscribers = set()
 
     async def find_peers(self):
         """Ask all peers for their peers.
@@ -69,6 +71,15 @@ class Peers:
             except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
 
+        if self.block_subscribers:
+            for subsciber in self.block_subscribers:
+                try:
+                    await subsciber.send(repr(block))
+
+                except ConnectionClosed:
+                    self.block_subscribers.remove(subsciber)
+
+
     async def find_longest_chain(self):
         """Find the longest chain.
         Returns:
@@ -110,101 +121,107 @@ class Node(Sanic, Blockchain, Peers):
         @self.route('/block', methods=['POST'])
         async def block(request):
             if request.body is None:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             try:
                 block = Block(json_dict=loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             if self.verify_block(block):
                 self.add_block(block)
                 await self.broadcast_block(block)
 
-                return response.json({'success': True}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             elif block.index > self.height + 1:
                 self.replace_chain()
 
-                return response.json({'success': True}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
-            return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+            return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/transaction', methods=['POST'])
         async def transaction(request):
             if request.body is None:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             try:
                 transaction = Transaction(
                     json_dict=loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             if not self.verify_transaction(transaction):
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             self.add_transaction(transaction)
             await self.broadcast_transaction(transaction)
 
-            return response.json({'success': True}, headers={'Content-Type': 'application/json'})
+            return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/getblock/<index:int>', methods=['GET'])
         def getblock(request, index):
             try:
-                return response.text(repr(self.block_from_index(index)))
+                return response.text(repr(self.block_from_index(index)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             except IndexError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/getlastblock', methods=['GET'])
         def getlastblock(request):
-            return response.json(loads(repr(self.last_block)), headers={'Content-Type': 'application/json'})
+            return response.json(loads(repr(self.last_block)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/blocks', methods=['GET'])
         def blocks(request):
-            return response.json(loads(repr(self.blocks)), headers={'Content-Type': 'application/json'})
+            return response.json(loads(repr(self.blocks)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/peers', methods=['GET', 'POST'])
         def peers(request):
             if request.method == 'GET':
-                return response.json(list(self.peers), headers={'Content-Type': 'application/json'})
+                return response.json(list(self.peers), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
             if request.method == 'POST':
                 if request.body is None:
-                    return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                    return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
                 if request.body.decode() == self.url:
-                    return response.json({'success': False}, headers={'Content-Type': 'application/json'})
+                    return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
                 self.peers.add(request.body.decode())
-                return response.json({'success': True}, headers={'Content-Type': 'application/json'})
+                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/balance/<address>', methods=['GET'])
         def balance(request, address):
-            return response.text(str(self.get_balance(address)))
+            return response.text(str(self.get_balance(address)), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/nonce/<address>', methods=['GET'])
         def nonce(request, address):
-            return response.text(str(self.get_account_nonce(address)))
+            return response.text(str(self.get_account_nonce(address)), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/pending', methods=['GET'])
         def pending(request):
-            return response.text(repr(self.pending))
+            return response.text(repr(self.pending), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/config', methods=['GET'])
         def config(request):
-            return response.json(self.config_, headers={'Content-Type': 'application/json'})
+            return response.json(self.config_, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
         @self.route('/difficulty', methods=['GET'])
         def difficulty(request):
-            return response.text(str(self.difficulty))
+            return response.text(str(self.difficulty), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/height', methods=['GET'])
         def height(request):
-            return response.text(str(self.height))
+            return response.text(str(self.height), headers={'Access-Control-Allow-Origin': '*'})
+
+        @self.websocket('/subscribeblock')
+        async def subscription(request, websocket):
+            self.block_subscribers.add(websocket)
+            while True:
+                await websocket.recv()
 
     async def mine(self, reward_address, lowest_fee=1):
         """Asynchronous POW task."""
