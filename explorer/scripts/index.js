@@ -35,29 +35,35 @@ function connect(URL) {
 
             // subscribes to new blocks
             $('#icon').attr("src", "images/success.png");
-            ws = new WebSocket("ws://" + URL + "/subscribeblock");
-            ws.onmessage = function(event) {
-                var block = JSON.parse(event.data);
-                $('#blocks').prepend(`<tr>
-                                        <th scope="row">` + block.index + `</th>
-                                        <td>` + block.hash + `</td>
-                                        <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
-                                        <td>` + block.data.length + `</td>
-                                      </tr>`);
-                $("time.timeago").timeago();
 
-                if ($("#blocks").children().length > 10) {
-                    $("#blocks").children().last().remove();
+            if (ws == undefined) {
+                ws = new WebSocket("ws://" + URL + "/subscribeblock");
+                ws.onmessage = function(event) {
+                    var block = JSON.parse(event.data);
+                    $('#blocks').prepend(`<tr>
+                                            <th scope="row">` + block.index + `</th>
+                                            <td>` + block.hash + `</td>
+                                            <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
+                                            <td>` + block.data.length + `</td>
+                                          </tr>`);
+                    $("time.timeago").timeago();
+    
+                    if ($("#blocks").children().length > 10) {
+                        $("#blocks").children().last().remove();
+                    }
                 }
-            }
+    
+                ws.onclose = function(event) {
+                    ws = undefined;
 
-            ws.onclose = function(event) {
-                $('#blocks').empty();
-                $('#blocks').append(`<tr>
-                                        <td colspan="4" id="noresults" class="text-center">Unable to Connect.</td>
-                                     </tr>`);
-                $('#icon').attr("src", "images/failure.png");
-                interval = setInterval(function(){connect($('#node-uri').val())}, 10000);
+                    $('#blocks').empty();
+                    $('#blocks').append(`<tr>
+                                            <td colspan="4" id="noresults" class="text-center">Unable to Connect.</td>
+                                         </tr>`);
+                    $('#icon').attr("src", "images/failure.png");
+
+                    interval = setInterval(function(){connect($('#node-uri').val())}, 10000);
+                }
             }
         },
         error: function(xhr, status, error) {
@@ -66,6 +72,7 @@ function connect(URL) {
             $('#icon').attr("src", "images/failure.png");
 
             interval = setInterval(function(){connect($('#node-uri').val())}, 10000);
+
             if (ws != undefined) {
                 ws.close();
             }
