@@ -269,6 +269,59 @@ class Node(Sanic, Blockchain, Peers):
                         mining_task = loop.create_task(self.mine(self.address))
                         print('Started mining task.')
 
+            elif cmd[0] == 'send':
+                with open('./asyncoin/config/keys.yaml') as key_file:
+                    enc_private = yaml.load(key_file.read())[
+                        'encrypted_private']
+
+                if enc_private:
+                    pass_ = await ainput('Enter your Passphrase > ')
+                    try:
+                        keys = KeyPair(
+                            decrypt(pass_.encode(), enc_private).decode())
+
+                    except ValueError:
+                        print('Unable to decrypt private key.')
+                        continue
+
+                    to = await ainput('Address to send to > ')
+                    amount = await ainput('Amount to send > ')
+
+                    try:
+                        amount = int(amount)
+
+                    except ValueError:
+                        print("That's not a number.")
+                        continue
+
+                    fee = await ainput('Fee (at least 1) > ')
+
+                    try:
+                        fee = int(fee)
+
+                    except ValueError:
+                        print("That's not a number.")
+                        continue
+
+                    balance = self.get_balance(keys.address)
+
+                    if amount > balance:
+                        print('You only have {}.'.format(balance))
+                        continue
+
+                    transaction = keys.Transaction(
+                        to=to, amount=amount, fee=fee, nonce=self.get_account_nonce(keys.address))
+
+                    print('Created Transaction {}'.format(transaction.hash))
+
+                    self.add_transaction(transaction)
+                    await self.broadcast_transaction(transaction)
+
+                    print('Broadcasting transaction...')
+
+                else:
+                    print('No encrypted key found in keys.yaml.')
+
             elif cmd[0] == 'balance':
                 if len(cmd) > 1:
                     print('Balance: {}'.format(self.get_balance(cmd[1])))
@@ -286,22 +339,22 @@ class Node(Sanic, Blockchain, Peers):
         """Spin up a blockchain and start the Sanic server."""
         with open('./asyncoin/config/keys.yaml') as key_file:
             enc_private = yaml.load(key_file.read())['encrypted_private']
-            if enc_private:
-                pass_ = input('Enter your Passphrase > ')
-                try:
-                    keys = KeyPair(
-                        decrypt(pass_.encode(), enc_private).decode())
 
-                except ValueError:
-                    raise ValueError('Unable to decrypt private key.')
+        if enc_private:
+            pass_ = input('Enter your Passphrase > ')
+            try:
+                keys = KeyPair(
+                    decrypt(pass_.encode(), enc_private).decode())
 
-            else:
-                print('No key found in config.yaml, generating new keys.')
-                pass_ = input('Enter a Passphrase > ')
-                keys = KeyPair()
+            except ValueError:
+                raise ValueError('Unable to decrypt private key.')
 
-                print(
-                    """
+        else:
+            print('No key found in keys.yaml, generating new keys.')
+            pass_ = input('Enter a Passphrase > ')
+            keys = KeyPair()
+            print(
+                """
 Encrypted Private Key: {0}
 Address: {1}
 """.format(encrypt(pass_.encode(), keys.hexprivate.encode()), keys.address))

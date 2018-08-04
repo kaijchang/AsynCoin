@@ -43,10 +43,10 @@ Started Blockchain and Mined Genesis Block.
 
 You can copy and paste the encrypted private key to the `encrypted_private` field in `config/keys.yaml` for using later.
 
-How to check address balances on your node:
+Getting balance:
 
 ```bash
-(NODE) > balance (automatically uses the generated or loaded address)
+(NODE) > balance
 Balance: 50 (from genesis block reward)
 ```
 
@@ -57,10 +57,10 @@ or
 Balance: 50
 ```
 
-How to mine on your node:
+Mining:
 
 ```bash
-(NODE) > mine (automatically uses the generated or loaded address)
+(NODE) > mine
 Started mining task.
 (NODE) > balance
 Balance: 150
@@ -68,8 +68,32 @@ Balance: 150
 Stopped mining task.
 ```
 
+Sending:
+
+```bash
+(NODE) > send
+Enter your Passphrase > passphrase_to_encrypt_key
+Address to send to > myfriend
+Amount to send > 49
+Fee (at least 1) > 1
+Created Transaction a2f92410d8ccb475ff9f21568cef0f370a5d9eeb199ee43e34c085b196e8f0ee
+Broadcasting transaction...
+(NODE) > mine
+Started mining task.
+```
+
+Wait a while to mine a block for your transaction to be included in the blockchain, then try checking the balance of 'myfriend'.
+
 Exiting gracefully:
 
 ```bash
 (NODE) > exit
 ```
+
+
+## TODO
+
+- Memory -> Storage
+- Easy to Use Blockchain Explorer
+- Implementations of features like checksummed addresses, merkle trees, mnemonics
+- Finish syncing with other nodes
