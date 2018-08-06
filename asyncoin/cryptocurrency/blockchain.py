@@ -13,16 +13,16 @@ from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.keys import Verifier
 
-with open('./asyncoin/config/config.yaml') as config_file:
+with open(os.path.join(os.path.dirname(__file__), os.pardir, 'config/config.yaml')) as config_file:
     config = yaml.load(config_file.read())
 
-with open('./asyncoin/sql/startup.sql') as script:
+with open(os.path.join(os.path.dirname(__file__), os.pardir, 'sql/startup.sql')) as script:
     startup_script = script.read()
 
-with open('./asyncoin/sql/block_template.sql') as script:
+with open(os.path.join(os.path.dirname(__file__), os.pardir, 'sql/block_template.sql')) as script:
     block_template = script.read()
 
-with open('./asyncoin/sql/transaction_template.sql') as script:
+with open(os.path.join(os.path.dirname(__file__), os.pardir, 'sql/transaction_template.sql')) as script:
     transaction_template = script.read()
 
 
@@ -119,15 +119,14 @@ class Blockchain:
         difficulty_check = block.hash.startswith(self.difficulty * '1')
         hash_check = block.previous_hash == last_block.hash
         index_check = block.index == await self.height()
-        transaction_check = all(self.verify_transaction(
-            transaction) for transaction in block[1:])
+        transaction_check = all(await asyncio.gather(*[asyncio.ensure_future(self.verify_transaction(
+            transaction)) for transaction in block[1:]])) if block[1:] else True
         reward_check = block[0].amount == self.reward + \
             sum(transaction.fee for transaction in block[1:])
         timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp() and block.timestamp < time.time() + \
             7200
 
-        # timestamp_check
-        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
+        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check, timestamp_check))
 
     def verify_genesis_block(self, genesis_block):
         """Verify a genesis block.
@@ -140,7 +139,7 @@ class Blockchain:
         """
         return genesis_block.hash.startswith(self.difficulty * '1') and genesis_block.index == 0 and len(genesis_block.data) == 1 and genesis_block[0].amount == self.reward
 
-    def verify_transaction(self, transaction):
+    async def verify_transaction(self, transaction):
         """Verify a transaction.
         Args:
             transaction (Transaction): transaction to verify.
@@ -150,14 +149,14 @@ class Blockchain:
             False if the transaction is invalid.
         """
         signature_check = Verifier(transaction.from_).verify(transaction)
-        balance_check = self.get_balance(
+        balance_check = await self.get_balance(
             transaction.from_) >= transaction.amount + transaction.fee
-        nonce_check = transaction.nonce == self.get_account_nonce(
+        nonce_check = transaction.nonce == await self.get_account_nonce(
             transaction.from_)
         decimal_check = decimal.Decimal(transaction.amount).as_tuple(
         ).exponent < 19 and decimal.Decimal(transaction.fee).as_tuple().exponent < 19
 
-        return all((signature_check, balance_check, nonce_check, whole_check))
+        return all((signature_check, balance_check, nonce_check, decimal_check))
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
@@ -196,11 +195,16 @@ class Blockchain:
         async with aiosqlite.connect(self.db) as db:
             async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" BETWEEN ? and ?', (start, end)) as cursor:
                 blocks = await cursor.fetchall()
+            hashes = tuple(block[1] for block in blocks)
+            if len(hashes) == 1:
+                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?', (hashes[0],)) as cursor:
+                    return [Block.from_tuple(blocks[0], await cursor.fetchall())]
 
-            async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" IN {0}'.format(tuple(block[1] for block in blocks))) as cursor:
-                transactions = await cursor.fetchall()
+            else:
+                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" IN {0}'.format(tuple(block[1] for block in blocks))) as cursor:
+                    transactions = await cursor.fetchall()
 
-            return [Block.from_tuple(block, tuple(transaction for transaction in transactions if transaction[0] == block[1])) for block in blocks]
+                return [Block.from_tuple(block, tuple(transaction for transaction in transactions if transaction[0] == block[1])) for block in blocks]
 
     async def add_block(self, block):
         """Wrapper around self.verify_block that adds a block to the blockchain if it's valid."""
@@ -233,9 +237,9 @@ class Blockchain:
 
         return False
 
-    def add_transaction(self, transaction):
+    async def add_transaction(self, transaction):
         """Wrapper around self.add_transaction that add a transactions to the mempool if it's valid."""
-        if self.verify_transaction(transaction):
+        if await self.verify_transaction(transaction):
             self.pending.append(transaction)
             return True
 
