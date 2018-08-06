@@ -2,12 +2,15 @@ import asyncio
 import unittest
 import os
 
-import sys
+try:
+    from asyncoin.cryptocurrency.blockchain import Blockchain
+    from asyncoin.cryptocurrency.keys import KeyPair
 
-sys.path.append('..')
-
-from asyncoin.cryptocurrency.blockchain import Blockchain
-from asyncoin.cryptocurrency.keys import KeyPair
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('..')
+    from asyncoin.cryptocurrency.blockchain import Blockchain
+    from asyncoin.cryptocurrency.keys import KeyPair
 
 
 class Test_Blockchain(unittest.TestCase):
