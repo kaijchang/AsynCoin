@@ -115,15 +115,16 @@ class Blockchain:
             True if the block is valid.
             False if the block is invalid.
         """
+        last_block = await self.last_block()
         difficulty_check = block.hash.startswith(self.difficulty * '1')
-        hash_check = block.previous_hash == self.last_block.hash
-        index_check = block.index == len(self.blocks)
+        hash_check = block.previous_hash == last_block.hash
+        index_check = block.index == await self.height()
         transaction_check = all(self.verify_transaction(
             transaction) for transaction in block[1:])
         reward_check = block[0].amount == self.reward + \
             sum(transaction.fee for transaction in block[1:])
-        # timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp and block.timestamp < time.time() + \
-        # 7200
+        timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp() and block.timestamp < time.time() + \
+            7200
 
         # timestamp_check
         return all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
@@ -158,21 +159,6 @@ class Blockchain:
 
         return all((signature_check, balance_check, nonce_check, whole_check))
 
-    @staticmethod
-    def is_valid_chain(chain):
-        """Static method to check the validity of a chain."""
-        blockchain = Blockchain()
-        if blockchain.verify_genesis_block(chain[0]):
-            blockchain.blocks[0] = chain[0]
-            for block in chain[1:]:
-                if not blockchain.add_block(block, syncing=True):
-                    return False
-
-        else:
-            return False
-
-        return True
-
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
             async with db.execute('SELECT COUNT(*)\nFROM BLOCKS;') as cursor:
@@ -188,7 +174,7 @@ class Blockchain:
 
         if index >= 0:
             async with aiosqlite.connect(self.db) as db:
-                async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" = ?;', str(index)) as cursor:
+                async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" = ?;', (str(index),)) as cursor:
                     block = await cursor.fetchone()
 
                 async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?;', (block[1],)) as cursor:
@@ -198,6 +184,23 @@ class Blockchain:
 
         else:
             return await self.block_from_index(await self.height() + index)
+
+    async def blocks_from_range(self, start, end):
+        height = await self.height()
+        start = start if start >= 0 else height + start
+        end = end if end >= 0 else height + end
+
+        if end > height - 1 or start > height - 1 or start > end:
+            raise IndexError
+
+        async with aiosqlite.connect(self.db) as db:
+            async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" BETWEEN ? and ?', (start, end)) as cursor:
+                blocks = await cursor.fetchall()
+
+            async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" IN {0}'.format(tuple(block[1] for block in blocks))) as cursor:
+                transactions = await cursor.fetchall()
+
+            return [Block.from_tuple(block, tuple(transaction for transaction in transactions if transaction[0] == block[1])) for block in blocks]
 
     async def add_block(self, block):
         """Wrapper around self.verify_block that adds a block to the blockchain if it's valid."""
@@ -238,32 +241,38 @@ class Blockchain:
 
         return False
 
-    def get_balance(self, address):
+    async def get_balance(self, address):
         """Gets the balance of an address.
 
         Returns:
             int: the amount of units of cryptocurrency the address owns.
         """
+        async with aiosqlite.connect(self.db) as db:
+            async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "SENDER" = ? OR "RECEIVER" = ?', (address, address)) as cursor:
+                transactions = [Transaction.from_tuple(transaction) for transaction in await cursor.fetchall()]
+
         balance = 0
 
-        for block in self.blocks:
-            for transaction in block.data:
-                if transaction.to == address:
-                    balance += transaction.amount
+        for transaction in transactions:
+            if transaction.to == address:
+                balance += transaction.amount
 
-                if transaction.from_ == address:
-                    balance -= transaction.amount
-                    balance -= transaction.fee
+            if transaction.from_ == address:
+                balance -= transaction.amount
+                balance -= transaction.fee
 
         return balance
 
-    def get_account_nonce(self, address):
+    async def get_account_nonce(self, address):
         """Gets the nonce of an address.
 
         Returns:
             int: the account's nonce.
         """
-        return len([transaction for block in self.blocks for transaction in block if transaction.from_ == address])
+        async with aiosqlite.connect(self.db) as db:
+            async with db.execute('SELECT COUNT(*) from "TRANSACTIONS" WHERE "SENDER" = ?', (address,)) as cursor:
+                result = await cursor.fetchone()
+                return result[0]
 
     async def lowest_acceptable_timestamp(self):
         """Gets the median timestamp of past 11 blocks.
@@ -271,10 +280,8 @@ class Blockchain:
         Returns:
             int: unix timestamp (lowest acceptable timestamp for new blocks)
         """
-        if not self.blocks:
-            return 0
+        height = await self.height()
+        if height < 11:
+            return statistics.median([block.timestamp for block in await self.blocks_from_range(0, height - 1)])
 
-        if await self.height() < 11:
-            return statistics.median([block.timestamp for block in self.blocks])
-
-        return statistics.median([block.timestamp for block in self.blocks[-11:]])
+        return statistics.median([block.timestamp for block in await self.blocks_from_range(-11, height - 1)])
