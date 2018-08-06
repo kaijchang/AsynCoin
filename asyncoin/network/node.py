@@ -79,7 +79,6 @@ class Peers:
                 except ConnectionClosed:
                     self.block_subscribers.remove(subsciber)
 
-
     async def find_longest_chain(self):
         """Find the longest chain.
         Returns:
@@ -229,24 +228,10 @@ class Node(Sanic, Blockchain, Peers):
 
     async def mine(self, reward_address, lowest_fee=1):
         """Asynchronous POW task."""
-        n = 0
         while True:
-            await asyncio.sleep(0)
-
-            acceptable_transactions = [
-                transaction for transaction in self.pending if transaction.fee >= lowest_fee]
-            reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
-                transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
-
-            block = Block(index=self.height, nonce=n, data=[
-                          reward_transaction] + acceptable_transactions, previous_hash=self.last_block.hash, timestamp=time.time())
-
-            if block.hash.startswith(self.difficulty * '1'):
-                self.add_block(block)
-                await self.broadcast_block(block)
-                n = 0
-
-            n += 1
+            await self.mine_block(reward_address, lowest_fee)
+            self.add_block(block)
+            await self.broadcast_block(block)
 
     async def interface(self):
         """Asynchronous user input task."""

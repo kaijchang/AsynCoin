@@ -16,10 +16,10 @@ class Block:
         timestamp (int): the time the block was created.
         hash (str): hexadecimal message digest of the block's contents.
     """
-    def __init__(self, json_dict=None, **kwargs):
+
+    def __init__(self, **kwargs):
         """
         Args:
-            json_dict(dict, optional): dictionary to load block data from.
             **kwargs:
                 index (int): the index of the block in the blockchain.
                 nonce (int): arbitrary value used in proof of work.
@@ -27,14 +27,7 @@ class Block:
                 previous_hash (str): the previous hash in the blockchain.
                 timestamp (int): the time the block was created.
         """
-        if json_dict is not None:
-            self.index = json_dict['index']
-            self.nonce = json_dict['nonce']
-            self.data = [Transaction(transaction) for transaction in json_dict['data']]
-            self.previous_hash = json_dict['previous_hash']
-            self.timestamp = json_dict['timestamp']
-
-        elif kwargs:
+        if kwargs:
             self.index = kwargs['index']
             self.nonce = kwargs['nonce']
             self.data = kwargs['data']
@@ -45,6 +38,23 @@ class Block:
     def hash(self):
         return sha256('{}{}{}{}{}'.format(self.index, self.nonce, self.previous_hash, self.data, self.timestamp).encode()).hexdigest()
 
+    @classmethod
+    def from_dict(cls, json_dict):
+        return cls(index=json_dict['index'],
+                   nonce=json_dict['nonce'],
+                   data=[Transaction.from_dict(dict_)
+                         for dict_ in json_dict['data']],
+                   previous_hash=json_dict['previous_hash'],
+                   timestamp=json_dict['timestamp'])
+
+    @classmethod
+    def from_tuple(cls, data_tuple, data):
+        return cls(index=data_tuple[0],
+                   nonce=data_tuple[2],
+                   data=[Transaction.from_tuple(tuple_) for tuple_ in data],
+                   previous_hash=data_tuple[3],
+                   timestamp=data_tuple[4])
+
     # Special class methods
 
     def __str__(self):
@@ -53,7 +63,8 @@ class Block:
     def __repr__(self):
         __dict__ = dict(self.__dict__)
 
-        __dict__['data'] = [transaction.__dict__ for transaction in __dict__['data']]
+        __dict__['data'] = [
+            transaction.__dict__ for transaction in __dict__['data']]
         __dict__['hash'] = self.hash
 
         return json.dumps(__dict__)

@@ -3,6 +3,11 @@
 import time
 import statistics
 import yaml
+import os
+import decimal
+
+import asyncio
+import aiosqlite
 
 from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.block import Block
@@ -11,21 +16,24 @@ from asyncoin.cryptocurrency.keys import Verifier
 with open('./asyncoin/config/config.yaml') as config_file:
     config = yaml.load(config_file.read())
 
+with open('./asyncoin/sql/startup.sql') as script:
+    startup_script = script.read()
+
+with open('./asyncoin/sql/block_template.sql') as script:
+    block_template = script.read()
+
+with open('./asyncoin/sql/transaction_template.sql') as script:
+    transaction_template = script.read()
+
 
 class Blockchain:
-    """A Cryptocurrency blockchain.
-    Attributes:
-        difficulty (str): the mining difficulty of the blockchain that all blocks have to start with.
-        reward (int): the amount of cryptocurrency units rewarded for each mined block.
-        blocks (list): a list of all the blocks in the blockchain.
-        pending (list): a list of all pending transactions.
-    """
+    """A Cryptocurrency blockchain."""
 
-    def __init__(self, config_=config, genesis_address=None, blocks=None):
+    def __init__(self, genesis_address=None, config_=config, db='blockchain.db'):
         """
         Args:
-            blocks (list, optional): a list of blocks to start the blockchain on.
-            genesis_address (str, optional): address for genesis block reward
+            genesis_address (str, optional): address for genesis block reward.
+            config (dict, optional): configuration for your blockchain.
         """
         self.config_ = config_
 
@@ -35,15 +43,19 @@ class Blockchain:
 
         self.pending = []
 
-        if blocks:
-            if self.is_valid_chain(blocks):
-                self.blocks = []
-                self.blocks.append(blocks[0])
-                for block in blocks[1:]:
-                    self.add_block(block, syncing=True)
+        self.db = db
 
-        else:
-            self.blocks = [self.mine_genesis_block(genesis_address)]
+        if not os.path.exists(self.db):
+            asyncio.get_event_loop().run_until_complete(
+                self.start_db(genesis_address))
+
+    async def start_db(self, genesis_address):
+        async with aiosqlite.connect(self.db) as db:
+            await db.executescript(startup_script)
+            block = self.mine_genesis_block(genesis_address)
+            await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
+            await db.execute(transaction_template, (block.hash, block.data[0].hash, block.data[0].to, block.data[0].from_, block.data[0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
+            await db.commit()
 
     def mine_genesis_block(self, genesis_address):
         """Mine the genesis block.
@@ -66,7 +78,7 @@ class Blockchain:
 
         return block
 
-    def mine_block(self, reward_address, lowest_fee=1):
+    async def mine_block(self, reward_address, lowest_fee=1):
         """Mine a block.
         Args:
             reward_address (str): the address to send the block's rewards to.
@@ -75,26 +87,25 @@ class Blockchain:
         Returns:
             Block: the mined block.
         """
-        acceptable_transactions = [
-            transaction for transaction in self.pending if transaction.fee >= lowest_fee]
         n = 0
-        reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
-            transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
-        block = Block(index=self.height, nonce=n, data=[
-                      reward_transaction] + acceptable_transactions, previous_hash=self.last_block.hash, timestamp=time.time())
+        while True:
+            last_block = await self.last_block()
+            await asyncio.sleep(0)
 
-        while not block.hash.startswith(self.difficulty * '1'):
             acceptable_transactions = [
                 transaction for transaction in self.pending if transaction.fee >= lowest_fee]
             reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
                 transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
+
+            block = Block(index=await self.height(), nonce=n, data=[
+                          reward_transaction] + acceptable_transactions, previous_hash=last_block.hash, timestamp=time.time())
+
+            if block.hash.startswith(self.difficulty * '1'):
+                return block
+
             n += 1
-            block = Block(index=self.height, nonce=n, data=[
-                          reward_transaction] + acceptable_transactions, previous_hash=self.last_block.hash, timestamp=time.time())
 
-        return block
-
-    def verify_block(self, block, syncing=False):
+    async def verify_block(self, block):
         """Verify a block.
         Args:
             block (Block): block to verify.
@@ -111,13 +122,11 @@ class Blockchain:
             transaction) for transaction in block[1:])
         reward_check = block[0].amount == self.reward + \
             sum(transaction.fee for transaction in block[1:])
-        timestamp_check = block.timestamp > self.lowest_acceptable_timestamp and block.timestamp < time.time() + \
-            7200
+        # timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp and block.timestamp < time.time() + \
+        # 7200
 
-        if syncing:
-            return all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
-
-        return all((difficulty_check, index_check, transaction_check, reward_check, timestamp_check, hash_check))
+        # timestamp_check
+        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
 
     def verify_genesis_block(self, genesis_block):
         """Verify a genesis block.
@@ -144,8 +153,10 @@ class Blockchain:
             transaction.from_) >= transaction.amount + transaction.fee
         nonce_check = transaction.nonce == self.get_account_nonce(
             transaction.from_)
+        decimal_check = decimal.Decimal(transaction.amount).as_tuple(
+        ).exponent < 19 and decimal.Decimal(transaction.fee).as_tuple().exponent < 19
 
-        return all((signature_check, balance_check, nonce_check))
+        return all((signature_check, balance_check, nonce_check, whole_check))
 
     @staticmethod
     def is_valid_chain(chain):
@@ -162,28 +173,47 @@ class Blockchain:
 
         return True
 
-    @property
-    def height(self):
-        return len(self.blocks)
+    async def height(self):
+        async with aiosqlite.connect(self.db) as db:
+            async with db.execute('SELECT COUNT(*)\nFROM BLOCKS;') as cursor:
+                result = await cursor.fetchone()
+                return result[0]
 
-    @property
-    def last_block(self):
-        return self.block_from_index(-1)
+    async def last_block(self):
+        return await self.block_from_index(-1)
 
-    def block_from_index(self, index):
-        return self.blocks[index]
+    async def block_from_index(self, index):
+        if index > await self.height():
+            raise IndexError
 
-    def add_block(self, block, syncing=False):
+        if index >= 0:
+            async with aiosqlite.connect(self.db) as db:
+                async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" = ?;', str(index)) as cursor:
+                    block = await cursor.fetchone()
+
+                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?;', (block[1],)) as cursor:
+                    transactions = await cursor.fetchall()
+
+                return Block.from_tuple(block, transactions)
+
+        else:
+            return await self.block_from_index(await self.height() + index)
+
+    async def add_block(self, block):
         """Wrapper around self.verify_block that adds a block to the blockchain if it's valid."""
-        if self.verify_block(block, syncing=syncing):
-            self.blocks.append(block)
+        if await self.verify_block(block):
+            async with aiosqlite.connect(self.db) as db:
+                await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
 
-            for transaction in block:
-                for t in self.pending:
-                    if t.hash == transaction.hash:
-                        self.pending.remove(t)
+                for transaction in block:
+                    await db.execute(transaction_template, (block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee))
+                    for t in self.pending:
+                        if t.hash == transaction.hash:
+                            self.pending.remove(t)
 
-            if self.height % self.config_['DIFFICULTY_ADJUST'] == 0:
+                await db.commit()
+
+            if await self.height() % self.config_['DIFFICULTY_ADJUST'] == 0:
                 time_delta = self.blocks[-self.config_['DIFFICULTY_ADJUST']
                                          ].timestamp - self.blocks[-1].timestamp
 
@@ -193,7 +223,7 @@ class Blockchain:
                 else:
                     self.difficulty -= 1
 
-            if self.height % self.config_['REWARD_HALVING'] == 0:
+            if await self.height() % self.config_['REWARD_HALVING'] == 0:
                 self.reward = self.reward / 2
 
             return True
@@ -235,8 +265,7 @@ class Blockchain:
         """
         return len([transaction for block in self.blocks for transaction in block if transaction.from_ == address])
 
-    @property
-    def lowest_acceptable_timestamp(self):
+    async def lowest_acceptable_timestamp(self):
         """Gets the median timestamp of past 11 blocks.
 
         Returns:
@@ -245,18 +274,7 @@ class Blockchain:
         if not self.blocks:
             return 0
 
-        if self.height < 11:
+        if await self.height() < 11:
             return statistics.median([block.timestamp for block in self.blocks])
 
         return statistics.median([block.timestamp for block in self.blocks[-11:]])
-
-    # Special class methods
-
-    def __iter__(self):
-        return iter(self.blocks)
-
-    def __getitem__(self, index):
-        return self.block_from_index(index)
-
-    def __len__(self):
-        return len(self.blocks)
