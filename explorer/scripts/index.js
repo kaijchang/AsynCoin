@@ -4,31 +4,38 @@ var ws;
 function connect(URL) {
     // pings node
     $.ajax({
-        url: "http://" + URL + "/blocks",
-        success: function(blocks) {
+        url: "http://" + URL + "/height",
+        success: function(height) {
             clearInterval(interval);
+            var height = parseInt(height);
             $('#blocks').empty();
-            if (blocks.length > 10) {
-                for (var i = 1; i < 11; i++) {
-                    var block = blocks[blocks.length - i];
-                    $('#blocks').append(`<tr>
-                                            <th scope="row">` + block.index + `</th>
-                                            <td>` + block.hash + `</td>
-                                            <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
-                                            <td>` + block.data.length + `</td>
-                                         </tr>`);
-                }
+
+            if (height > 10) {
+                $.get("http://" + URL + "/blockrange/" + (height - 10) + "/" + (height - 1), function (blocks) {
+                    for (var i = 1; i < 11; i++) {
+                        var block = blocks[blocks.length - i];
+                        $('#blocks').append(`<tr>
+                                                <th scope="row">` + block.index + `</th>
+                                                <td>` + block.hash + `</td>
+                                                <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
+                                                <td>` + block.data.length + `</td>
+                                             </tr>`);
+                    }
+                });
+                
             }
             else {
-                for (var i = 1; i < blocks.length + 1; i++) {
-                    var block = blocks[blocks.length - i];
-                    $('#blocks').append(`<tr>
-                                            <th scope="row">` + block.index + `</th>
-                                            <td>` + block.hash + `</td>
-                                            <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
-                                            <td>` + block.data.length + `</td>
-                                         </tr>`);
-                }
+                $.get("http://" + URL + "/blockrange/" + (height - 10) + "/" + (height - 1), function (blocks) {
+                    for (var i = 1; i < blocks.length + 1; i++) {
+                        var block = blocks[blocks.length - i];
+                        $('#blocks').append(`<tr>
+                                                <th scope="row">` + block.index + `</th>
+                                                <td>` + block.hash + `</td>
+                                                <td><time class="timeago" datetime="` + new Date(block.timestamp * 1000).toISOString() +`">` + block.timestamp + `</time></td>
+                                                <td>` + block.data.length + `</td>
+                                             </tr>`);
+                    }
+                });
             }
 
             $("time.timeago").timeago();
