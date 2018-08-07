@@ -25,7 +25,7 @@ function connect(URL) {
                 
             }
             else {
-                $.get("http://" + URL + "/blockrange/" + (height - 10) + "/" + (height - 1), function (blocks) {
+                $.get("http://" + URL + "/blockrange/0/" + (height - 1), function (blocks) {
                     for (var i = 1; i < blocks.length + 1; i++) {
                         var block = blocks[blocks.length - i];
                         $('#blocks').append(`<tr>
