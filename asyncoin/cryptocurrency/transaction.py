@@ -16,10 +16,10 @@ class Transaction:
         fee (int): transaction fee paid to miners to prevent spam attack.
         nonce (int): account nonce to prevent replay attack.
     """
+
     def __init__(self, json_dict=None, **kwargs):
         """
         Args:
-            json_dict (dict, optional): dictionary to load transaction data from.
             **kwargs:
                 to (str): address that the transaction is to.
                 from_ (str): address that the transaction is from.
@@ -28,17 +28,7 @@ class Transaction:
                 fee (int): transaction fee paid to miners to prevent spam attack.
                 nonce (int): account nonce to prevent replay attack.
         """
-
-        if json_dict is not None:
-            self.to = json_dict['to']
-            self.from_ = json_dict['from_']
-            self.amount = json_dict['amount']
-            self.timestamp = json_dict['timestamp']
-            self.signature = json_dict['signature']
-            self.nonce = json_dict['nonce']
-            self.fee = json_dict['fee']
-
-        elif kwargs:
+        if kwargs:
             self.to = kwargs['to']
             self.from_ = kwargs['from_']
             self.amount = kwargs['amount']
@@ -46,6 +36,26 @@ class Transaction:
             self.signature = kwargs.get('signature')
             self.nonce = kwargs['nonce']
             self.fee = kwargs['fee']
+
+    @classmethod
+    def from_dict(cls, json_dict):
+        return cls(to=json_dict['to'],
+                   from_=json_dict['from_'],
+                   amount=json_dict['amount'],
+                   timestamp=json_dict['timestamp'],
+                   signature=json_dict['signature'],
+                   nonce=json_dict['nonce'],
+                   fee=json_dict['fee'])
+
+    @classmethod
+    def from_tuple(cls, data_tuple):
+        return cls(to=data_tuple[2],
+                   from_=data_tuple[3],
+                   amount=data_tuple[4],
+                   timestamp=data_tuple[5],
+                   signature=data_tuple[6],
+                   nonce=data_tuple[7],
+                   fee=data_tuple[8])
 
     @property
     def hash(self):

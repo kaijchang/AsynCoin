@@ -3,3 +3,4 @@ aiohttp == 3.3.2
 ecdsa == 0.13
 sanic == 0.7.0
 aioconsole == 0.1.10
+aiosqlite == 0.3.0

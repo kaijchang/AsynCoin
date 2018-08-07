@@ -1,6 +1,6 @@
 # AsynCoin
 
-AsynCoin is a very in-progress build of a basic implementation of a cryptocurrency and a blockchain using Python's [asyncio](https://docs.python.org/3/library/asyncio.html).
+AsynCoin is a very in-progress build of a basic implementation of a cryptocurrency and a blockchain using Python's [AsyncIO](https://docs.python.org/3/library/asyncio.html).
 
 ## Table of Contents
 
@@ -8,20 +8,7 @@ AsynCoin is a very in-progress build of a basic implementation of a cryptocurren
 
 [Blockchain Explorer](https://github.com/kajchang/asyncoin#blockchain-explorer)
 
-## Requirements
-
-`PyYAML` - Used for loading blockchain and key configuration data from `.yaml` files.
-
-`ecdsa` - Used for signing and verifying transactions trustlessly.
-
-`sanic` - Async compatible [web framework](https://github.com/channelcat/sanic) used to run nodes.
-
-`aiohttp` - Used to make asynchronous HTTP requests to nodes.
-
-`aioconsole` - Used to asynchronously get user input.
-
-
-## Installation
+## Getting Started
 
 ```bash
 $ git clone https://github.com/kajchang/asyncoin.git
@@ -102,9 +89,14 @@ Exiting gracefully:
 
 This is an in-progress way to live monitor your blockchain in your browser. It uses websockets to subscribe to new blocks, and you can access it on [Github Pages](https://kajchang.github.io/AsynCoin/explorer/index.html) or by opening the `index.html` file in the `explorer` folder in your browser.
 
+## Testing
+
+```bash
+$ python3 -m unittest discover
+```
+
 ## TODO
 
-- Memory -> Storage
 - Finish Blockchain Explorer
 - Implementations of features like checksummed addresses, merkle trees, mnemonics
 - Finish syncing with other nodes
