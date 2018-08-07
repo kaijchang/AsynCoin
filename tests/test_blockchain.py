@@ -17,7 +17,7 @@ class Test_Blockchain(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
         self.keys = KeyPair()
-        self.blockchain = Blockchain(self.keys.address)
+        self.blockchain = Blockchain(self.keys.address, db='test.db')
 
     def test_mining(self):
         async def mining():
@@ -42,7 +42,7 @@ class Test_Blockchain(unittest.TestCase):
         self.loop.run_until_complete(sending())
 
     def tearDown(self):
-        os.remove('blockchain.db')
+        os.remove('test.db')
 
 
 if __name__ == '__main__':

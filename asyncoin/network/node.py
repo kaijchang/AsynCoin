@@ -10,6 +10,7 @@ from json import loads
 import time
 import yaml
 import logging
+import os
 from websockets.exceptions import ConnectionClosed
 
 from asyncoin.cryptocurrency.blockchain import Blockchain
@@ -50,8 +51,7 @@ class Peers:
         for peer in peers:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.post('http://{}/transaction'.format(peer), data=repr(transaction)):
-                        pass
+                    await session.post('http://{}/transaction'.format(peer), data=repr(transaction))
 
             except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
@@ -65,8 +65,7 @@ class Peers:
         for peer in peers:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.post('http://{}/block'.format(peer), data=repr(block)):
-                        pass
+                    await session.post('http://{}/block'.format(peer), data=repr(block))
 
             except aiohttp.client_exceptions.ClientConnectorError:
                 self.peers.remove(peer)
@@ -117,104 +116,104 @@ class Node(Sanic, Blockchain, Peers):
         Peers.__init__(self)
         Sanic.__init__(self, __name__)
 
+        headers = {'Content-Type': 'application/json',
+                   'Access-Control-Allow-Origin': '*'}
+
         @self.route('/block', methods=['POST'])
         async def block(request):
             if request.body is None:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': False}, headers=headers)
 
             try:
-                block = Block(json_dict=loads(request.body.decode()))
+                block = Block.from_dict(loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': False}, headers=headers)
 
-            if self.verify_block(block):
-                self.add_block(block)
+            if await self.add_block(block):
                 await self.broadcast_block(block)
 
-                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': True}, headers=headers)
 
-            elif block.index > self.height + 1:
-                self.replace_chain()
-
-                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
-
-            return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+            return response.json({'success': False}, headers=headers)
 
         @self.route('/transaction', methods=['POST'])
         async def transaction(request):
             if request.body is None:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': False}, headers=headers)
 
             try:
-                transaction = Transaction(
-                    json_dict=loads(request.body.decode()))
+                transaction = Transaction.from_dict(
+                    loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': False}, headers=headers)
 
-            if not self.verify_transaction(transaction):
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+            if not await self.add_transaction(transaction):
+                return response.json({'success': False}, headers=headers)
 
-            self.add_transaction(transaction)
             await self.broadcast_transaction(transaction)
 
-            return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+            return response.json({'success': True}, headers=headers)
 
-        @self.route('/getblock/<index:int>', methods=['GET'])
-        def getblock(request, index):
+        @self.route('/blocks/<index:number>', methods=['GET'])
+        async def getblock(request, index):
             try:
-                return response.text(repr(self.block_from_index(index)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.text(repr(await self.block_from_index(index)), headers=headers)
 
             except IndexError:
-                return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': False}, headers=headers)
 
         @self.route('/getlastblock', methods=['GET'])
-        def getlastblock(request):
-            return response.json(loads(repr(self.last_block)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+        async def getlastblock(request):
+            return response.json(loads(repr(await self.last_block())), headers=headers)
 
-        @self.route('/blocks', methods=['GET'])
-        def blocks(request):
-            return response.json(loads(repr(self.blocks)), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+        @self.route('/blockrange/<start:number>/<end:number>', methods=['GET'])
+        async def blockrange(request, start, end):
+            try:
+                return response.json(loads(repr(await self.blocks_from_range(start, end))), headers=headers)
+
+            except IndexError:
+                return response.json({'success': False}, headers=headers)
 
         @self.route('/peers', methods=['GET', 'POST'])
         def peers(request):
             if request.method == 'GET':
-                return response.json(list(self.peers), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json(list(self.peers), headers=headers)
 
             if request.method == 'POST':
                 if request.body is None:
-                    return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                    return response.json({'success': False}, headers=headers)
 
                 if request.body.decode() == self.url:
-                    return response.json({'success': False}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                    return response.json({'success': False}, headers=headers)
 
                 self.peers.add(request.body.decode())
-                return response.json({'success': True}, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+                return response.json({'success': True}, headers=headers)
 
         @self.route('/balance/<address>', methods=['GET'])
-        def balance(request, address):
-            return response.text(str(self.get_balance(address)), headers={'Access-Control-Allow-Origin': '*'})
+        async def balance(request, address):
+            return response.text(str(await self.get_balance(address)), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/nonce/<address>', methods=['GET'])
-        def nonce(request, address):
-            return response.text(str(self.get_account_nonce(address)), headers={'Access-Control-Allow-Origin': '*'})
+        async def nonce(request, address):
+            return response.text(str(await self.get_account_nonce(address)), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/pending', methods=['GET'])
         def pending(request):
-            return response.text(repr(self.pending), headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+            return response.json(loads(repr(self.pending)), headers=headers)
 
         @self.route('/config', methods=['GET'])
         def config(request):
-            return response.json(self.config_, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
+            return response.json(self.config_, headers=headers)
 
         @self.route('/difficulty', methods=['GET'])
         def difficulty(request):
             return response.text(str(self.difficulty), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.route('/height', methods=['GET'])
-        def height(request):
-            return response.text(str(self.height), headers={'Access-Control-Allow-Origin': '*'})
+        async def height(request):
+            return response.text(str(await self.height()), headers={'Access-Control-Allow-Origin': '*'})
 
         @self.websocket('/subscribeblock')
         async def subscription(request, websocket):
@@ -229,8 +228,8 @@ class Node(Sanic, Blockchain, Peers):
     async def mine(self, reward_address, lowest_fee=1):
         """Asynchronous POW task."""
         while True:
-            await self.mine_block(reward_address, lowest_fee)
-            self.add_block(block)
+            block = await self.mine_block(reward_address, lowest_fee)
+            await self.add_block(block)
             await self.broadcast_block(block)
 
     async def interface(self):
@@ -309,18 +308,18 @@ class Node(Sanic, Blockchain, Peers):
                         print("That's not a number.")
                         continue
 
-                    balance = self.get_balance(keys.address)
+                    balance = await self.get_balance(keys.address)
 
                     if amount > balance:
                         print('You only have {}.'.format(balance))
                         continue
 
                     transaction = keys.Transaction(
-                        to=to, amount=amount, fee=fee, nonce=self.get_account_nonce(keys.address))
+                        to=to, amount=amount, fee=fee, nonce=await self.get_account_nonce(keys.address))
 
                     print('Created Transaction {}'.format(transaction.hash))
 
-                    self.add_transaction(transaction)
+                    await self.add_transaction(transaction)
                     await self.broadcast_transaction(transaction)
 
                     print('Broadcasting transaction...')
@@ -330,10 +329,10 @@ class Node(Sanic, Blockchain, Peers):
 
             elif cmd[0] == 'balance':
                 if len(cmd) > 1:
-                    print('Balance: {}'.format(self.get_balance(cmd[1])))
+                    print('Balance: {}'.format(await self.get_balance(cmd[1])))
 
                 else:
-                    print('Balance: {}'.format(self.get_balance(self.address)))
+                    print('Balance: {}'.format(await self.get_balance(self.address)))
 
             elif cmd[0] == 'exit':
                 for task in asyncio.Task.all_tasks():
@@ -365,11 +364,17 @@ Encrypted Private Key: {0}
 Address: {1}
 """.format(encrypt(pass_.encode(), keys.hexprivate.encode()), keys.address))
 
-        Blockchain.__init__(self, genesis_address=keys.address)
-
-        print('Started Blockchain and Mined Genesis Block.')
-
         self.address = keys.address
+
+        if not os.path.exists('blockchain.db'):
+            Blockchain.__init__(self, genesis_address=keys.address)
+
+            print('Started Blockchain and Mined Genesis Block.')
+
+        else:
+            Blockchain.__init__(self)
+
+            print('Loaded Blockchain from Database.')
 
         loop = asyncio.get_event_loop()
 

@@ -201,7 +201,7 @@ class Blockchain:
                     return [Block.from_tuple(blocks[0], await cursor.fetchall())]
 
             else:
-                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" IN {0}'.format(tuple(block[1] for block in blocks))) as cursor:
+                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" IN ({0}?)'.format('?,' * (len(blocks) - 1)), tuple(block[1] for block in blocks)) as cursor:
                     transactions = await cursor.fetchall()
 
                 return [Block.from_tuple(block, tuple(transaction for transaction in transactions if transaction[0] == block[1])) for block in blocks]
@@ -211,9 +211,8 @@ class Blockchain:
         if await self.verify_block(block):
             async with aiosqlite.connect(self.db) as db:
                 await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
-
+                await db.executemany(transaction_template, [(block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee) for transaction in block])
                 for transaction in block:
-                    await db.execute(transaction_template, (block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee))
                     for t in self.pending:
                         if t.hash == transaction.hash:
                             self.pending.remove(t)
