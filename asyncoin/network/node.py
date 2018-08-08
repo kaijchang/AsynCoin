@@ -374,13 +374,14 @@ Address: {1}
 
         self.address = keys.address
 
-        if not os.path.exists(self.db):
-            Blockchain.__init__(self, genesis_address=keys.address, db=self.db)
+        if not os.path.exists('{}{}'.format(self.port, self.db)):
+            Blockchain.__init__(
+                self, genesis_address=keys.address, db='{}{}'.format(self.port, self.db))
 
             print('Started Blockchain and Mined Genesis Block.')
 
         else:
-            Blockchain.__init__(self, db=self.db)
+            Blockchain.__init__(self, db='{}{}'.format(self.port, self.db))
 
             print('Loaded Blockchain from Database.')
 

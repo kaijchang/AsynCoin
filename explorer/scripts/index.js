@@ -40,10 +40,9 @@ function connect(URL) {
 
             $("time.timeago").timeago();
 
-            // subscribes to new blocks
             $('#icon').attr("src", "images/success.png");
 
-
+            // subscribes to new blocks
             ws = new WebSocket("ws://" + URL + "/subscribeblock");
             ws.onmessage = function(event) {
                 var block = JSON.parse(event.data);

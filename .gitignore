@@ -60,3 +60,5 @@ target/
 blockchain\.db
 
 \.DS_Store
+
+*.db
