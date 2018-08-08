@@ -87,7 +87,7 @@ Exiting gracefully:
 
 ![explorer.png](https://github.com/kajchang/AsynCoin/raw/master/assets/explorer.png)
 
-This is an in-progress way to live monitor your blockchain in your browser. It uses websockets to subscribe to new blocks, and you can access it on [Github Pages](https://kajchang.github.io/AsynCoin/explorer/index.html) or by opening the `index.html` file in the `explorer` folder in your browser.
+This is an in-progress way to live monitor your blockchain in your browser. It uses websockets to subscribe to new blocks, and you can access it by opening the `index.html` file in the `explorer` folder in your browser.
 
 ## Testing
 

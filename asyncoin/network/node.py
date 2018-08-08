@@ -12,6 +12,8 @@ import yaml
 import logging
 import os
 from websockets.exceptions import ConnectionClosed
+from urllib.parse import urlparse
+import socket
 
 from asyncoin.cryptocurrency.blockchain import Blockchain
 from asyncoin.cryptocurrency.block import Block
@@ -112,7 +114,10 @@ class Peers:
 class Node(Sanic, Blockchain, Peers):
     """A Node the communicates over Http using Sanic and requests."""
 
-    def __init__(self):
+    def __init__(self, port=8000, db='blockchain.db'):
+        self.port = port
+        self.db = db
+
         Peers.__init__(self)
         Sanic.__init__(self, __name__)
 
@@ -231,6 +236,9 @@ class Node(Sanic, Blockchain, Peers):
             block = await self.mine_block(reward_address, lowest_fee)
             await self.add_block(block)
             await self.broadcast_block(block)
+
+    async def sync(self, uri):
+        pass
 
     async def interface(self):
         """Asynchronous user input task."""
@@ -366,13 +374,13 @@ Address: {1}
 
         self.address = keys.address
 
-        if not os.path.exists('blockchain.db'):
-            Blockchain.__init__(self, genesis_address=keys.address)
+        if not os.path.exists(self.db):
+            Blockchain.__init__(self, genesis_address=keys.address, db=self.db)
 
             print('Started Blockchain and Mined Genesis Block.')
 
         else:
-            Blockchain.__init__(self)
+            Blockchain.__init__(self, db=self.db)
 
             print('Loaded Blockchain from Database.')
 
@@ -380,6 +388,7 @@ Address: {1}
 
         self.add_task(self.interface())
 
-        loop.create_task(Sanic.create_server(self))
+        loop.create_task(Sanic.create_server(
+            self, host=socket.gethostbyname(socket.getfqdn()), port=self.port))
 
         loop.run_forever()

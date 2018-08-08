@@ -85,8 +85,20 @@ function connect(URL) {
 }
 
 $(document).ready(function() {
-    connect('127.0.0.1:8000');
-    $('#node-uri').on('input', function() {
-        connect(this.value);
-    });
+    // https://stackoverflow.com/questions/20194722/can-you-get-a-users-local-lan-ip-address-via-javascript
+    window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection; //compatibility for Firefox and chrome
+    var pc = new RTCPeerConnection({iceServers:[]});    
+    pc.createDataChannel(''); //create a bogus data channel
+    pc.createOffer(pc.setLocalDescription.bind(pc), function(){});// create offer and set local description
+    pc.onicecandidate = function(ice) {
+        if (ice && ice.candidate && ice.candidate.candidate) {
+            var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];  
+            pc.onicecandidate = function(){};
+            connect(myIP + ":8000");
+            $("#node-uri").attr("value", myIP + ":8000");
+            $("#node-uri").on("input", function() {
+                connect(this.value);
+            });
+        }
+    }
 });
