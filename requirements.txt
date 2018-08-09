@@ -1,6 +1,8 @@
 PyYAML == 3.12
-aiohttp == 3.3.2
-ecdsa == 0.13
-sanic == 0.7.0
 aioconsole == 0.1.10
+aiohttp == 3.3.2
 aiosqlite == 0.3.0
+ecdsa == 0.13
+pycryptodome == 3.6.4
+sanic == 0.7.0
+websockets == 4.0.1

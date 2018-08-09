@@ -160,7 +160,7 @@ class Blockchain:
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
-            async with db.execute('SELECT COUNT(*)\nFROM BLOCKS;') as cursor:
+            async with db.execute('SELECT COUNT(*) FROM BLOCKS;') as cursor:
                 result = await cursor.fetchone()
                 return result[0]
 

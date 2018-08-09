@@ -7,15 +7,16 @@ import asyncio
 from aioconsole import ainput
 
 from json import loads
-import time
 import yaml
 import logging
 import os
 from websockets.exceptions import ConnectionClosed
 from urllib.parse import urlparse
 import socket
+import aiosqlite
+import sys
 
-from asyncoin.cryptocurrency.blockchain import Blockchain
+from asyncoin.cryptocurrency.blockchain import Blockchain, startup_script, block_template, transaction_template
 from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.keys import KeyPair
@@ -111,7 +112,7 @@ class Peers:
         return []
 
 
-class Node(Sanic, Blockchain, Peers):
+class Node(Blockchain, Peers):
     """A Node the communicates over Http using Sanic and requests."""
 
     def __init__(self, port=8000, db='blockchain.db'):
@@ -119,108 +120,106 @@ class Node(Sanic, Blockchain, Peers):
         self.db = db
 
         Peers.__init__(self)
-        Sanic.__init__(self, __name__)
 
-        headers = {'Content-Type': 'application/json',
-                   'Access-Control-Allow-Origin': '*'}
+        self.app = Sanic(__name__)
 
-        @self.route('/block', methods=['POST'])
+        @self.app.route('/block', methods=['POST'])
         async def block(request):
             if request.body is None:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
             try:
                 block = Block.from_dict(loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
             if await self.add_block(block):
                 await self.broadcast_block(block)
 
-                return response.json({'success': True}, headers=headers)
+                return response.json({'success': True}, headers={'Access-Control-Allow-Origin': '*'})
 
-            return response.json({'success': False}, headers=headers)
+            return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/transaction', methods=['POST'])
+        @self.app.route('/transaction', methods=['POST'])
         async def transaction(request):
             if request.body is None:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
             try:
                 transaction = Transaction.from_dict(
                     loads(request.body.decode()))
 
             except KeyError:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
             if not await self.add_transaction(transaction):
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
             await self.broadcast_transaction(transaction)
 
-            return response.json({'success': True}, headers=headers)
+            return response.json({'success': True}, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/blocks/<index:number>', methods=['GET'])
-        async def getblock(request, index):
+        @self.app.route('/blocks/<index:number>', methods=['GET'])
+        async def blocks(request, index):
             try:
-                return response.text(repr(await self.block_from_index(index)), headers=headers)
+                return response.json(loads(repr(await self.block_from_index(index))), headers={'Access-Control-Allow-Origin': '*'})
 
             except IndexError:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/getlastblock', methods=['GET'])
+        @self.app.route('/getlastblock', methods=['GET'])
         async def getlastblock(request):
-            return response.json(loads(repr(await self.last_block())), headers=headers)
+            return response.json(loads(repr(await self.last_block())), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/blockrange/<start:number>/<end:number>', methods=['GET'])
+        @self.app.route('/blockrange/<start:number>/<end:number>', methods=['GET'])
         async def blockrange(request, start, end):
             try:
-                return response.json(loads(repr(await self.blocks_from_range(start, end))), headers=headers)
+                return response.json(loads(repr(await self.blocks_from_range(start, end))), headers={'Access-Control-Allow-Origin': '*'})
 
             except IndexError:
-                return response.json({'success': False}, headers=headers)
+                return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/peers', methods=['GET', 'POST'])
-        def peers(request):
+        @self.app.route('/peers', methods=['GET', 'POST'])
+        async def peers(request):
             if request.method == 'GET':
-                return response.json(list(self.peers), headers=headers)
+                return response.json(list(self.peers), headers={'Access-Control-Allow-Origin': '*'})
 
             if request.method == 'POST':
                 if request.body is None:
-                    return response.json({'success': False}, headers=headers)
+                    return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
-                if request.body.decode() == self.url:
-                    return response.json({'success': False}, headers=headers)
+                if request.body.decode() == '{}:{}'.format(socket.gethostbyname(socket.getfqdn()), self.port):
+                    return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
                 self.peers.add(request.body.decode())
-                return response.json({'success': True}, headers=headers)
+                return response.json({'success': True}, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/balance/<address>', methods=['GET'])
+        @self.app.route('/balance/<address>', methods=['GET'])
         async def balance(request, address):
             return response.text(str(await self.get_balance(address)), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/nonce/<address>', methods=['GET'])
+        @self.app.route('/nonce/<address>', methods=['GET'])
         async def nonce(request, address):
             return response.text(str(await self.get_account_nonce(address)), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/pending', methods=['GET'])
-        def pending(request):
-            return response.json(loads(repr(self.pending)), headers=headers)
+        @self.app.route('/pending', methods=['GET'])
+        async def pending(request):
+            return response.json(loads(repr(self.pending)), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/config', methods=['GET'])
-        def config(request):
-            return response.json(self.config_, headers=headers)
+        @self.app.route('/config', methods=['GET'])
+        async def config(request):
+            return response.json(self.config_, headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/difficulty', methods=['GET'])
+        @self.app.route('/difficulty', methods=['GET'])
         def difficulty(request):
             return response.text(str(self.difficulty), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.route('/height', methods=['GET'])
+        @self.app.route('/height', methods=['GET'])
         async def height(request):
             return response.text(str(await self.height()), headers={'Access-Control-Allow-Origin': '*'})
 
-        @self.websocket('/subscribeblock')
+        @self.app.websocket('/subscribeblock')
         async def subscription(request, websocket):
             self.block_subscribers.add(websocket)
             while True:
@@ -348,7 +347,64 @@ class Node(Sanic, Blockchain, Peers):
 
                 loop.stop()
 
-    def run(self):
+    async def sync(self, sync_url):
+        node_url = urlparse(sync_url).netloc if urlparse(
+            sync_url).netloc else urlparse(sync_url).path
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get('http://{}/config'.format(node_url)) as response:
+                    config = await response.json()
+
+            except aiohttp.client_exceptions.ClientConnectorError:
+                print('Unable to sync.')
+                sys.exit()
+
+        async with aiosqlite.connect('{}{}'.format(self.port, self.db)) as db:
+            await db.executescript(startup_script)
+            await db.commit()
+
+        Blockchain.__init__(self, config_=config,
+                            db='{}{}'.format(self.port, self.db))
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get('http://{}/blocks/0'.format(node_url)) as response:
+                block = Block.from_dict(await response.json())
+
+        if self.verify_genesis_block(block):
+            async with aiosqlite.connect(self.db) as db:
+                await db.execute(block_template, (block.index, block.hash,
+                                                  block.nonce, block.previous_hash, block.timestamp))
+                await db.execute(transaction_template, (block.hash, block.data[0].hash, block.data[0].to, block.data[0].from_, block.data[
+                    0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
+                await db.commit()
+
+        while True:
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://{}/height'.format(node_url)) as response:
+                    height = int(await response.text())
+
+                async with session.get('http://{}/blockrange/0/{}'.format(node_url, height - 1)) as response:
+                    await asyncio.gather(*[self.add_block(Block.from_dict(block)) for block in await response.json()])
+
+                if await self.height() == height:
+                    break
+
+        self.peers.add(node_url)
+        for node in await self.find_peers():
+            self.peers.add(node)
+
+        peers = set(self.peers)
+
+        for peer in peers:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    await session.post('http://{}/peers'.format(node_url), data='{}:{}'.format(socket.gethostbyname(socket.getfqdn()), self.port))
+
+            except aiohttp.client_exceptions.ClientConnectorError:
+                self.peers.remove(peer)
+
+    def run(self, sync=None):
         """Spin up a blockchain and start the Sanic server."""
         with open('./asyncoin/config/keys.yaml') as key_file:
             enc_private = yaml.load(key_file.read())['encrypted_private']
@@ -375,21 +431,30 @@ Address: {1}
         self.address = keys.address
 
         if not os.path.exists('{}{}'.format(self.port, self.db)):
-            Blockchain.__init__(
-                self, genesis_address=keys.address, db='{}{}'.format(self.port, self.db))
+            if sync is None:
+                Blockchain.__init__(
+                    self, genesis_address=keys.address, db='{}{}'.format(self.port, self.db))
 
-            print('Started Blockchain and Mined Genesis Block.')
+                print('Started Blockchain and Mined Genesis Block.')
+
+            else:
+                asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         else:
-            Blockchain.__init__(self, db='{}{}'.format(self.port, self.db))
+            if sync is None:
+                Blockchain.__init__(self, db='{}{}'.format(self.port, self.db))
 
-            print('Loaded Blockchain from Database.')
+                print('Loaded Blockchain from Database.')
+
+            else:
+                os.remove('{}{}'.format(self.port, self.db))
+                asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         loop = asyncio.get_event_loop()
 
-        self.add_task(self.interface())
+        self.app.add_task(self.interface())
 
-        loop.create_task(Sanic.create_server(
-            self, host=socket.gethostbyname(socket.getfqdn()), port=self.port))
+        loop.create_task(self.app.create_server(
+            host=socket.gethostbyname(socket.getfqdn()), port=self.port))
 
         loop.run_forever()
