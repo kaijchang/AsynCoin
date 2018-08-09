@@ -21,8 +21,9 @@ function connect(URL) {
                                                 <td>` + block.data.length + `</td>
                                              </tr>`);
                     }
+                    $("time.timeago").timeago();
                 });
-                
+                $("time.timeago").timeago();
             }
             else {
                 $.get("http://" + URL + "/blockrange/0/" + (height - 1), function (blocks) {
@@ -35,10 +36,9 @@ function connect(URL) {
                                                 <td>` + block.data.length + `</td>
                                              </tr>`);
                     }
+                    $("time.timeago").timeago();
                 });
             }
-
-            $("time.timeago").timeago();
 
             $('#icon').attr("src", "images/success.png");
 
