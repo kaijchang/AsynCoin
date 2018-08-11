@@ -422,11 +422,15 @@ class Node(Blockchain, Peers):
             print('No key found in keys.yaml, generating new keys.')
             pass_ = input('Enter a Passphrase > ')
             keys = KeyPair()
+            encrypted_key = encrypt(pass_.encode(), keys.hexprivate.encode())
             print(
                 """
 Encrypted Private Key: {0}
 Address: {1}
-""".format(encrypt(pass_.encode(), keys.hexprivate.encode()), keys.address))
+""".format(encrypted_key, keys.address))
+
+            with open('./asyncoin/config/keys.yaml', 'w') as key_file:
+                key_file.write(yaml.dump({'encrypted_private': encrypted_key}))
 
         self.address = keys.address
 

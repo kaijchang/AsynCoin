@@ -121,8 +121,9 @@ class Blockchain:
         index_check = block.index == await self.height()
         transaction_check = all(await asyncio.gather(*[asyncio.ensure_future(self.verify_transaction(
             transaction)) for transaction in block[1:]])) if block[1:] else True
-        reward_check = block[0].amount == self.reward + \
-            sum(transaction.fee for transaction in block[1:])
+        reward_check = block[0].amount <= self.reward + \
+            sum(transaction.fee for transaction in block[1:]) and block[0].from_ == 'Network' and len(
+                block[0].to) == 96
         timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp() and block.timestamp < time.time() + \
             7200
 
@@ -155,8 +156,10 @@ class Blockchain:
             transaction.from_)
         decimal_check = decimal.Decimal(transaction.amount).as_tuple(
         ).exponent < 19 and decimal.Decimal(transaction.fee).as_tuple().exponent < 19
+        address_check = len(transaction.to) == 96 and len(
+            transaction.from_) == 96
 
-        return all((signature_check, balance_check, nonce_check, decimal_check))
+        return all((signature_check, balance_check, nonce_check, decimal_check, address_check))
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
@@ -246,6 +249,8 @@ class Blockchain:
 
     async def get_balance(self, address):
         """Gets the balance of an address.
+        Args:
+            address (str): the address to get balance for.
 
         Returns:
             int: the amount of units of cryptocurrency the address owns.
@@ -268,6 +273,8 @@ class Blockchain:
 
     async def get_account_nonce(self, address):
         """Gets the nonce of an address.
+        Args:
+            address (str): the address to get a nonce for.
 
         Returns:
             int: the account's nonce.

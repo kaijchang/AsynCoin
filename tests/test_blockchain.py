@@ -28,16 +28,19 @@ class Test_Blockchain(unittest.TestCase):
         self.loop.run_until_complete(mining())
 
     def test_sending(self):
+        friend_address = KeyPair().address
+        miner_address = KeyPair().address
+
         async def sending():
             transaction = self.keys.Transaction(
-                to='myfriend', amount=49, fee=1, nonce=0)
+                to=friend_address, amount=49, fee=1, nonce=0)
             await self.blockchain.add_transaction(transaction)
-            block = await self.blockchain.mine_block('miner')
+            block = await self.blockchain.mine_block(miner_address)
             await self.blockchain.add_block(block)
 
             self.assertEqual(await self.blockchain.get_balance(self.keys.address), 0)
-            self.assertEqual(await self.blockchain.get_balance('myfriend'), 49)
-            self.assertEqual(await self.blockchain.get_balance('miner'), 51)
+            self.assertEqual(await self.blockchain.get_balance(friend_address), 49)
+            self.assertEqual(await self.blockchain.get_balance(miner_address), 51)
 
         self.loop.run_until_complete(sending())
 

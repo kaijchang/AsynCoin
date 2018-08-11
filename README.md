@@ -100,7 +100,7 @@ Of course, logically replace the port with any open port, and the `-sync` argume
 
 ![explorer.png](https://github.com/kajchang/AsynCoin/raw/master/assets/explorer.png)
 
-This is an in-progress way to live monitor your blockchain in your browser. It uses websockets to subscribe to new blocks, and you can access it by opening the `index.html` file in the `explorer` folder in your browser.
+This is an in-progress way to live monitor your blockchain in your browser. It uses websockets to subscribe to new blocks, and you can access it by opening the `index.html` file in the `explorer` folder in your browser or executing `open explorer/index.html`.
 
 ## Testing
 
