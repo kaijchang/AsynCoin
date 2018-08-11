@@ -215,24 +215,28 @@ class Blockchain:
             async with aiosqlite.connect(self.db) as db:
                 await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
                 await db.executemany(transaction_template, [(block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee) for transaction in block])
-                for transaction in block:
+                for transaction in block[1:]:
                     for t in self.pending:
                         if t.hash == transaction.hash:
                             self.pending.remove(t)
 
                 await db.commit()
 
-            if await self.height() % self.config_['DIFFICULTY_ADJUST'] == 0:
-                time_delta = self.blocks[-self.config_['DIFFICULTY_ADJUST']
-                                         ].timestamp - self.blocks[-1].timestamp
+            height = await self.height()
 
-                if time_delta / self.config_['DIFFICULTY_ADJUST'] < self.config_['TIME_TARGET']:
-                    self.difficulty += 1
+            if height % self.config_['DIFFICULTY_ADJUST'] == 0:
+                async with aiosqlite.connect(self.db) as db:
+                    async with db.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (height - self.config_['DIFFICULTY_ADJUST'] - 1,)) as cursor:
+                        beginning_time = await cursor.fetchone()
+                        time_delta = block.timestamp - beginning_time[0]
 
-                else:
-                    self.difficulty -= 1
+                    if time_delta / self.config_['DIFFICULTY_ADJUST'] < self.config_['TIME_TARGET']:
+                        self.difficulty += 1
 
-            if await self.height() % self.config_['REWARD_HALVING'] == 0:
+                    elif self.difficulty != 1:
+                        self.difficulty -= 1
+
+            if height % self.config_['REWARD_HALVING'] == 0:
                 self.reward = self.reward / 2
 
             return True
