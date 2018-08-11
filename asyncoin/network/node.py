@@ -81,36 +81,6 @@ class Peers:
                 except ConnectionClosed:
                     self.block_subscribers.remove(subsciber)
 
-    async def find_longest_chain(self):
-        """Find the longest chain.
-        Returns:
-            list: the longest chain of blocks.
-        """
-        heights = []
-        peers = list(self.peers)
-        for peer in peers:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get('http://{}/height'.format(peer)) as response:
-                        height = await response.text()
-                        heights.append(int(height))
-
-            except aiohttp.client_exceptions.ClientConnectorError:
-                self.peers.remove(peer)
-
-        if heights:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get('http://{}/blocks'.format(list(self.peers)[heights.index(max(heights))])) as response:
-                        blocks = await response.json()
-
-                return [Block(json_dict=block) for block in blocks]
-
-            except aiohttp.client_exceptions.ClientConnectorError:
-                self.peers.remove(peer)
-
-        return []
-
 
 class Node(Blockchain, Peers):
     """A Node the communicates over Http using Sanic and requests."""
@@ -379,18 +349,25 @@ class Node(Blockchain, Peers):
                     0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
                 await db.commit()
 
-        while True:
-            async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:
                 async with session.get('http://{}/height'.format(node_url)) as response:
                     height = int(await response.text())
 
-                async with session.get('http://{}/blockrange/0/{}'.format(node_url, height - 1)) as response:
-                    await asyncio.gather(*[self.add_block(Block.from_dict(block)) for block in await response.json()])
+        while True:
+            async with aiohttp.ClientSession() as session:
+                for x in range(round(height / 50)):
+                    async with session.get('http://{}/blockrange/{}/{}'.format(node_url, x * 50 + 1, x * 50 + 51 if x * 50 + 51 <= height - 1 else height - 1)) as response:
+                        for block in await response.json():
+                            await self.add_block(Block.from_dict(block), syncing=True)
 
-                if await self.height() == height:
-                    break
+                async with session.get('http://{}/height'.format(node_url)) as response:
+                    height = int(await response.text())
+
+            if height == await self.height():
+                break
 
         self.peers.add(node_url)
+
         for node in await self.find_peers():
             self.peers.add(node)
 

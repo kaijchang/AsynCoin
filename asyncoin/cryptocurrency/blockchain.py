@@ -105,7 +105,7 @@ class Blockchain:
 
             n += 1
 
-    async def verify_block(self, block):
+    async def verify_block(self, block, syncing=False):
         """Verify a block.
         Args:
             block (Block): block to verify.
@@ -127,7 +127,7 @@ class Blockchain:
         timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp() and block.timestamp < time.time() + \
             7200
 
-        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check, timestamp_check))
+        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check, timestamp_check)) if not syncing else all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
 
     def verify_genesis_block(self, genesis_block):
         """Verify a genesis block.
@@ -209,9 +209,9 @@ class Blockchain:
 
                 return [Block.from_tuple(block, tuple(transaction for transaction in transactions if transaction[0] == block[1])) for block in blocks]
 
-    async def add_block(self, block):
+    async def add_block(self, block, syncing=False):
         """Wrapper around self.verify_block that adds a block to the blockchain if it's valid."""
-        if await self.verify_block(block):
+        if await self.verify_block(block, syncing):
             async with aiosqlite.connect(self.db) as db:
                 await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
                 await db.executemany(transaction_template, [(block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee) for transaction in block])
@@ -226,7 +226,7 @@ class Blockchain:
 
             if height % self.config_['DIFFICULTY_ADJUST'] == 0:
                 async with aiosqlite.connect(self.db) as db:
-                    async with db.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (height - self.config_['DIFFICULTY_ADJUST'] - 1,)) as cursor:
+                    async with db.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (height - self.config_['DIFFICULTY_ADJUST'],)) as cursor:
                         beginning_time = await cursor.fetchone()
                         time_delta = block.timestamp - beginning_time[0]
 
