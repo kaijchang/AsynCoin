@@ -68,7 +68,7 @@ class Blockchain:
                     x * self.config_['DIFFICULTY_ADJUST'],)).fetchone()[0]
 
                 time_delta = c.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (x * self.config_[
-                                       'DIFFICULTY_ADJUST'] + self.config_['DIFFICULTY_ADJUST'],)).fetchone()[0] - beginning_time[0]
+                                       'DIFFICULTY_ADJUST'] + self.config_['DIFFICULTY_ADJUST'] - 1,)).fetchone()[0] - beginning_time
                 if time_delta / self.config_['DIFFICULTY_ADJUST'] < self.config_['TIME_TARGET']:
                     self.difficulty += 1
 
