@@ -22,7 +22,7 @@ from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.keys import KeyPair
 
-from asyncoin.utilities.encryption import decrypt, encrypt
+from asyncoin.utilities.encryption import decrypt
 
 
 class Peers:
@@ -42,7 +42,7 @@ class Peers:
         for peer in self.peers:
             async with aiohttp.ClientSession() as session:
                 async with session.get('http://{}/peers'.format(peer)) as response:
-                    peers += await response.json()
+                    peers.append(await response.json())
 
         return peers
 
@@ -249,8 +249,16 @@ class Node(Blockchain, Peers):
                         print('The node is already mining.')
 
                     else:
-                        mining_task = loop.create_task(self.mine(self.address))
-                        print('Started mining task.')
+                        with open('./asyncoin/config/keys.yaml') as key_file:
+                            address = yaml.load(key_file.read())['address']
+
+                        if not address:
+                            print(
+                                "No address found in 'keys.yaml', use 'python3 run.py generate' not generate a pair.")
+
+                        else:
+                            mining_task = loop.create_task(self.mine(address))
+                            print('Started mining task.')
 
             elif cmd[0] == 'send':
                 with open('./asyncoin/config/keys.yaml') as key_file:
@@ -268,6 +276,11 @@ class Node(Blockchain, Peers):
                         continue
 
                     to = await ainput('Address to send to > ')
+
+                    if len(to) != 96:
+                        print('The address must be 96 characters long.')
+                        continue
+
                     amount = await ainput('Amount to send > ')
 
                     try:
@@ -310,7 +323,15 @@ class Node(Blockchain, Peers):
                     print('Balance: {}'.format(await self.get_balance(cmd[1])))
 
                 else:
-                    print('Balance: {}'.format(await self.get_balance(self.address)))
+                    with open('./asyncoin/config/keys.yaml') as key_file:
+                        address = yaml.load(key_file.read())['address']
+
+                    if not address:
+                        print(
+                            "No address found in 'keys.yaml', use 'python3 run.py generate' not generate a pair.")
+
+                    else:
+                        print('Balance: {}'.format(await self.get_balance(address)))
 
             elif cmd[0] == 'exit':
                 for task in asyncio.Task.all_tasks():
@@ -379,7 +400,6 @@ class Node(Blockchain, Peers):
             async with aiohttp.ClientSession() as session:
                 # Sync in 50 block chunks to just in case
                 for x in range(math.floor(our_height / 50), math.ceil(peer_height / 50)):
-                    print('http://{}/blockrange/{}/{}'.format(node_url, our_height, our_height + 50 if our_height + 50 <= peer_height - 1 else peer_height - 1))
                     async with session.get('http://{}/blockrange/{}/{}'.format(node_url, our_height, our_height + 50 if our_height + 50 <= peer_height - 1 else peer_height - 1)) as response:
                         # not using asyncio.wait or asyncio.gather to preserve order
                         for block in await response.json():
@@ -409,40 +429,19 @@ class Node(Blockchain, Peers):
         """Spin up a blockchain and start the Sanic server."""
         self.db = '{}{}'.format(self.port, self.db)
 
-        with open('./asyncoin/config/keys.yaml') as key_file:
-            enc_private = yaml.load(key_file.read())['encrypted_private']
-
-        if enc_private:
-            pass_ = input('Enter your Passphrase > ')
-            try:
-                keys = KeyPair(
-                    decrypt(pass_.encode(), enc_private).decode())
-
-            except ValueError:
-                raise ValueError('Unable to decrypt private key.')
-
-        else:
-            print('No key found in keys.yaml, generating new keys.')
-            pass_ = input('Enter a Passphrase > ')
-            keys = KeyPair()
-            encrypted_key = encrypt(pass_.encode(), keys.hexprivate.encode())
-            print(
-                """
-Encrypted Private Key: {0}
-Address: {1}
-""".format(encrypted_key, keys.address))
-
-            with open('./asyncoin/config/keys.yaml', 'w') as key_file:
-                key_file.write(yaml.dump({'encrypted_private': encrypted_key}))
-
-        self.address = keys.address
-
         if sync is not None:
             asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         elif not os.path.exists(self.db):
+            with open('./asyncoin/config/keys.yaml') as key_file:
+                address = yaml.load(key_file.read())['address']
+
+            if not address:
+                raise KeyError(
+                    "No address found in 'keys.yaml', use 'python3 run.py generate' not generate a pair.")
+
             Blockchain.__init__(
-                self, genesis_address=keys.address, db=self.db)
+                self, genesis_address=address, db=self.db)
 
             print('Started Blockchain and Mined Genesis Block.')
 

@@ -6,6 +6,9 @@ from argparse import ArgumentParser
 from asyncoin.network.node import Node
 from asyncoin.network.client import Client
 
+from asyncoin.cryptocurrency.keys import KeyPair
+from asyncoin.utilities.encryption import encrypt
+
 
 parser = ArgumentParser()
 parser.add_argument('mode')
@@ -22,3 +25,12 @@ if args.mode.lower() == 'client':
 elif args.mode.lower() == 'node':
     node = Node(args.port, args.db)
     node.run(args.sync)
+
+elif args.mode.lower() == 'generate':
+    pass_ = input('Enter a Passphrase > ')
+    keys = KeyPair()
+    encrypted_key = encrypt(pass_.encode(), keys.hexprivate.encode())
+    print("""
+Encrypted Private Key: {0}
+Address: {1}
+""".format(encrypted_key, keys.address))
