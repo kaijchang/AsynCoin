@@ -112,4 +112,5 @@ $ python3 -m unittest discover
 
 - Finish Blockchain Explorer
 - Implementations of features like checksummed addresses, merkle trees, mnemonics
+- Move more of UI from cli -> web
 - Dockerize?
