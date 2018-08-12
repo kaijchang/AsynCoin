@@ -5,6 +5,8 @@ import statistics
 import yaml
 import os
 import decimal
+import sqlite3
+import math
 
 import asyncio
 import aiosqlite
@@ -35,19 +37,45 @@ class Blockchain:
             genesis_address (str, optional): address for genesis block reward.
             config (dict, optional): configuration for your blockchain.
         """
-        self.config_ = config_
-
-        self.difficulty = self.config_['INITIAL_DIFFICULTY']
-
-        self.reward = self.config_['INITIAL_REWARD']
-
         self.pending = []
 
         self.db = db
 
+        self.config_ = config_
+
         if not os.path.exists(self.db):
+            self.config_ = config_
+            self.reward = config_['INITIAL_REWARD']
+            self.difficulty = config_['INITIAL_DIFFICULTY']
             asyncio.get_event_loop().run_until_complete(
                 self.start_db(genesis_address))
+
+        else:
+            conn = sqlite3.connect(self.db)
+            c = conn.cursor()
+            config_ = c.execute('SELECT * FROM "CONFIG"').fetchone()
+            self.config_ = {'REWARD_HALVING': config_[0],
+                            'TIME_TARGET': config_[1],
+                            'DIFFICULTY_ADJUST': config_[2],
+                            'INITIAL_REWARD': config_[3],
+                            'INITIAL_DIFFICULTY': config_[4]}
+
+            self.reward = self.config_['INITIAL_REWARD'] / pow(2, c.execute(
+                'SELECT COUNT(*) FROM BLOCKS').fetchone()[0] / self.config_['REWARD_HALVING'])
+            self.difficulty = self.config_['INITIAL_DIFFICULTY']
+            for x in range(math.floor(c.execute('SELECT COUNT(*) FROM BLOCKS').fetchone()[0] / self.config_['DIFFICULTY_ADJUST'])):
+                beginning_time = c.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (
+                    x * self.config_['DIFFICULTY_ADJUST'],)).fetchone()[0]
+
+                time_delta = c.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (x * self.config_[
+                                       'DIFFICULTY_ADJUST'] + self.config_['DIFFICULTY_ADJUST'],)).fetchone()[0] - beginning_time[0]
+                if time_delta / self.config_['DIFFICULTY_ADJUST'] < self.config_['TIME_TARGET']:
+                    self.difficulty += 1
+
+                elif self.difficulty != 1:
+                    self.difficulty -= 1
+
+            conn.close()
 
     async def start_db(self, genesis_address):
         async with aiosqlite.connect(self.db) as db:
@@ -55,6 +83,7 @@ class Blockchain:
             block = self.mine_genesis_block(genesis_address)
             await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
             await db.execute(transaction_template, (block.hash, block.data[0].hash, block.data[0].to, block.data[0].from_, block.data[0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
+            await db.execute('INSERT INTO "CONFIG" VALUES (?, ?, ?, ?, ?)', (self.config_['REWARD_HALVING'], self.config_['TIME_TARGET'], self.config_['DIFFICULTY_ADJUST'], self.config_['INITIAL_REWARD'], self.config_['INITIAL_DIFFICULTY']))
             await db.commit()
 
     def mine_genesis_block(self, genesis_address):
@@ -163,7 +192,7 @@ class Blockchain:
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
-            async with db.execute('SELECT COUNT(*) FROM BLOCKS;') as cursor:
+            async with db.execute('SELECT COUNT(*) FROM BLOCKS') as cursor:
                 result = await cursor.fetchone()
                 return result[0]
 
@@ -176,10 +205,10 @@ class Blockchain:
 
         if index >= 0:
             async with aiosqlite.connect(self.db) as db:
-                async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" = ?;', (str(index),)) as cursor:
+                async with db.execute('SELECT * FROM "BLOCKS" WHERE "NUMBER" = ?', (str(index),)) as cursor:
                     block = await cursor.fetchone()
 
-                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?;', (block[1],)) as cursor:
+                async with db.execute('SELECT * FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?', (block[1],)) as cursor:
                     transactions = await cursor.fetchall()
 
                 return Block.from_tuple(block, transactions)

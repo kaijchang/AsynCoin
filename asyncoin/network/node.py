@@ -344,8 +344,9 @@ class Node(Blockchain, Peers):
 
             async with aiohttp.ClientSession() as session:
                 async with session.get('http://{}/blocks/{}'.format(node_url, last_block_index)) as response:
-                    if Block.from_dict(await response.json()).hash == last_block.hash:
-                        sync_from = last_block.index
+                    if Block.from_dict(await response.json()).hash != last_block.hash:
+                        raise ValueError(
+                            'Unable to sync from that node, blocks are not the same.')
 
         else:
             # don't use Blockchain.start_db so we don't mine genesis block
@@ -368,30 +369,26 @@ class Node(Blockchain, Peers):
                         0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
                     await db.commit()
 
-            sync_from = 1
-
         async with aiohttp.ClientSession() as session:
             async with session.get('http://{}/height'.format(node_url)) as response:
-                height = int(await response.text())
+                peer_height = int(await response.text())
 
-        while True:
+        our_height = await self.height()
+
+        while peer_height != our_height:
             async with aiohttp.ClientSession() as session:
                 # Sync in 50 block chunks to just in case
-                for x in range(math.floor(sync_from / 50), math.floor(height / 50)):
-                    async with session.get('http://{}/blockrange/{}/{}'.format(node_url, sync_from, sync_from + 50 if sync_from + 50 <= height - 1 else height - 1)) as response:
+                for x in range(math.floor(our_height / 50), math.ceil(peer_height / 50)):
+                    print('http://{}/blockrange/{}/{}'.format(node_url, our_height, our_height + 50 if our_height + 50 <= peer_height - 1 else peer_height - 1))
+                    async with session.get('http://{}/blockrange/{}/{}'.format(node_url, our_height, our_height + 50 if our_height + 50 <= peer_height - 1 else peer_height - 1)) as response:
                         # not using asyncio.wait or asyncio.gather to preserve order
                         for block in await response.json():
-                            await self.add_block(Block.from_dict(block), syncing=True)
+                            print(await self.add_block(Block.from_dict(block), syncing=True))
 
-                    sync_from += 50
+                    our_height = await self.height()
 
                 async with session.get('http://{}/height'.format(node_url)) as response:
                     height = int(await response.text())
-
-            # Check if we're still in sync (if there have been no new blocks while we were syncing)
-            # Replace with subscribing to websocket later?
-            if height == await self.height():
-                break
 
         self.peers.add(node_url)
 
@@ -441,7 +438,6 @@ Address: {1}
         self.address = keys.address
 
         if sync is not None:
-            print('hi')
             asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         elif not os.path.exists(self.db):
