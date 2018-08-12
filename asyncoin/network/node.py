@@ -14,9 +14,10 @@ from websockets.exceptions import ConnectionClosed
 from urllib.parse import urlparse
 import socket
 import aiosqlite
-import sys
+import math
 
-from asyncoin.cryptocurrency.blockchain import Blockchain, startup_script, block_template, transaction_template
+from asyncoin.cryptocurrency.blockchain import (
+    Blockchain, startup_script, block_template, transaction_template)
 from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.keys import KeyPair
@@ -318,6 +319,7 @@ class Node(Blockchain, Peers):
                 loop.stop()
 
     async def sync(self, sync_url):
+        # get rid of schema or extra / at end
         node_url = urlparse(sync_url).netloc if urlparse(
             sync_url).netloc else urlparse(sync_url).path
 
@@ -327,42 +329,67 @@ class Node(Blockchain, Peers):
                     config = await response.json()
 
             except aiohttp.client_exceptions.ClientConnectorError:
-                print('Unable to sync.')
-                sys.exit()
+                print('That node is not online.')
+                for task in asyncio.Task.all_tasks():
+                    task.cancel()
 
-        async with aiosqlite.connect('{}{}'.format(self.port, self.db)) as db:
-            await db.executescript(startup_script)
-            await db.commit()
+                loop.stop()
 
-        Blockchain.__init__(self, config_=config,
-                            db='{}{}'.format(self.port, self.db))
+        if os.path.exists(self.db):
+            Blockchain.__init__(self, config_=config,
+                                db=self.db)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get('http://{}/blocks/0'.format(node_url)) as response:
-                block = Block.from_dict(await response.json())
+            last_block = await self.last_block()
+            last_block_index = last_block.index
 
-        if self.verify_genesis_block(block):
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://{}/blocks/{}'.format(node_url, last_block_index)) as response:
+                    if Block.from_dict(await response.json()).hash == last_block.hash:
+                        sync_from = last_block.index
+
+        else:
+            # don't use Blockchain.start_db so we don't mine genesis block
             async with aiosqlite.connect(self.db) as db:
-                await db.execute(block_template, (block.index, block.hash,
-                                                  block.nonce, block.previous_hash, block.timestamp))
-                await db.execute(transaction_template, (block.hash, block.data[0].hash, block.data[0].to, block.data[0].from_, block.data[
-                    0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
+                await db.executescript(startup_script)
                 await db.commit()
 
+            Blockchain.__init__(self, config_=config,
+                                db=self.db)
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://{}/blocks/0'.format(node_url)) as response:
+                    block = Block.from_dict(await response.json())
+
+            if self.verify_genesis_block(block):
+                async with aiosqlite.connect(self.db) as db:
+                    await db.execute(block_template, (block.index, block.hash,
+                                                      block.nonce, block.previous_hash, block.timestamp))
+                    await db.execute(transaction_template, (block.hash, block.data[0].hash, block.data[0].to, block.data[0].from_, block.data[
+                        0].amount, block.data[0].timestamp, block.data[0].signature, block.data[0].nonce, block.data[0].fee))
+                    await db.commit()
+
+            sync_from = 1
+
         async with aiohttp.ClientSession() as session:
-                async with session.get('http://{}/height'.format(node_url)) as response:
-                    height = int(await response.text())
+            async with session.get('http://{}/height'.format(node_url)) as response:
+                height = int(await response.text())
 
         while True:
             async with aiohttp.ClientSession() as session:
-                for x in range(round(height / 50)):
-                    async with session.get('http://{}/blockrange/{}/{}'.format(node_url, x * 50 + 1, x * 50 + 51 if x * 50 + 51 <= height - 1 else height - 1)) as response:
+                # Sync in 50 block chunks to just in case
+                for x in range(math.floor(sync_from / 50), math.floor(height / 50)):
+                    async with session.get('http://{}/blockrange/{}/{}'.format(node_url, sync_from, sync_from + 50 if sync_from + 50 <= height - 1 else height - 1)) as response:
+                        # not using asyncio.wait or asyncio.gather to preserve order
                         for block in await response.json():
                             await self.add_block(Block.from_dict(block), syncing=True)
+
+                    sync_from += 50
 
                 async with session.get('http://{}/height'.format(node_url)) as response:
                     height = int(await response.text())
 
+            # Check if we're still in sync (if there have been no new blocks while we were syncing)
+            # Replace with subscribing to websocket later?
             if height == await self.height():
                 break
 
@@ -383,6 +410,8 @@ class Node(Blockchain, Peers):
 
     def run(self, sync=None):
         """Spin up a blockchain and start the Sanic server."""
+        self.db = '{}{}'.format(self.port, self.db)
+
         with open('./asyncoin/config/keys.yaml') as key_file:
             enc_private = yaml.load(key_file.read())['encrypted_private']
 
@@ -411,25 +440,21 @@ Address: {1}
 
         self.address = keys.address
 
-        if not os.path.exists('{}{}'.format(self.port, self.db)):
-            if sync is None:
-                Blockchain.__init__(
-                    self, genesis_address=keys.address, db='{}{}'.format(self.port, self.db))
+        if sync is not None:
+            asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
-                print('Started Blockchain and Mined Genesis Block.')
+        elif not os.path.exists(self.db):
+            Blockchain.__init__(
+                self, genesis_address=keys.address, db=self.db)
 
-            else:
-                asyncio.get_event_loop().run_until_complete(self.sync(sync))
+            print('Started Blockchain and Mined Genesis Block.')
 
         else:
-            if sync is None:
-                Blockchain.__init__(self, db='{}{}'.format(self.port, self.db))
+            Blockchain.__init__(self, db=self.db)
 
-                print('Loaded Blockchain from Database.')
+            print('Loaded Blockchain from Database.')
 
-            else:
-                os.remove('{}{}'.format(self.port, self.db))
-                asyncio.get_event_loop().run_until_complete(self.sync(sync))
+            asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         loop = asyncio.get_event_loop()
 
