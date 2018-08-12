@@ -333,7 +333,7 @@ class Node(Blockchain, Peers):
                 for task in asyncio.Task.all_tasks():
                     task.cancel()
 
-                loop.stop()
+                asyncio.get_event_loop().stop()
 
         if os.path.exists(self.db):
             Blockchain.__init__(self, config_=config,
@@ -441,6 +441,7 @@ Address: {1}
         self.address = keys.address
 
         if sync is not None:
+            print('hi')
             asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         elif not os.path.exists(self.db):
@@ -453,8 +454,6 @@ Address: {1}
             Blockchain.__init__(self, db=self.db)
 
             print('Loaded Blockchain from Database.')
-
-            asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         loop = asyncio.get_event_loop()
 
