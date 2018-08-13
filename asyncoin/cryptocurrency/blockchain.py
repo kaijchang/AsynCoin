@@ -121,8 +121,15 @@ class Blockchain:
             last_block = await self.last_block()
             await asyncio.sleep(0)
 
+            acceptable_transactions = []
+
+            for t in sorted(self.pending, key=lambda t: t.nonce):
+                if t.fee >= lowest_fee and t.nonce == await self.get_account_nonce(t.from_) + len([tr for tr in acceptable_transactions if tr.from_ == t.from_]):
+                    acceptable_transactions.append(t)
+
             acceptable_transactions = [
                 transaction for transaction in self.pending if transaction.fee >= lowest_fee]
+
             reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
                 transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
 
@@ -148,15 +155,13 @@ class Blockchain:
         difficulty_check = block.hash.startswith(self.difficulty * '1')
         hash_check = block.previous_hash == last_block.hash
         index_check = block.index == await self.height()
-        transaction_check = all(await asyncio.gather(*[asyncio.ensure_future(self.verify_transaction(
-            transaction)) for transaction in block[1:]])) if block[1:] else True
         reward_check = block[0].amount <= self.reward + \
             sum(transaction.fee for transaction in block[1:]) and block[0].from_ == 'Network' and len(
                 block[0].to) == 96
         timestamp_check = block.timestamp > await self.lowest_acceptable_timestamp() and block.timestamp < time.time() + \
             7200
 
-        return all((difficulty_check, index_check, transaction_check, reward_check, hash_check, timestamp_check)) if not syncing else all((difficulty_check, index_check, transaction_check, reward_check, hash_check))
+        return all((difficulty_check, index_check, reward_check, hash_check, timestamp_check)) if not syncing else all((difficulty_check, index_check, reward_check, hash_check))
 
     def verify_genesis_block(self, genesis_block):
         """Verify a genesis block.
@@ -181,14 +186,12 @@ class Blockchain:
         signature_check = Verifier(transaction.from_).verify(transaction)
         balance_check = await self.get_balance(
             transaction.from_) >= transaction.amount + transaction.fee
-        nonce_check = transaction.nonce == await self.get_account_nonce(
-            transaction.from_)
         decimal_check = decimal.Decimal(transaction.amount).as_tuple(
         ).exponent < 19 and decimal.Decimal(transaction.fee).as_tuple().exponent < 19
         address_check = len(transaction.to) == 96 and len(
             transaction.from_) == 96
 
-        return all((signature_check, balance_check, nonce_check, decimal_check, address_check))
+        return all((signature_check, balance_check, address_check))
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
@@ -243,7 +246,19 @@ class Blockchain:
         if await self.verify_block(block, syncing):
             async with aiosqlite.connect(self.db) as db:
                 await db.execute(block_template, (block.index, block.hash, block.nonce, block.previous_hash, block.timestamp))
-                await db.executemany(transaction_template, [(block.hash, transaction.hash, transaction.to, transaction.from_, transaction.amount, transaction.timestamp, transaction.signature, transaction.nonce, transaction.fee) for transaction in block])
+                await db.execute(transaction_template, (block.hash, block[0].hash, block[0].to, block[0].from_, block[0].amount, block[0].timestamp, block[0].signature, block[0].nonce, block[0].fee))
+
+                # step through transaction execution
+                for t in block[1:]:
+                    if await self.verify_transaction(t) and t.nonce == await self.get_account_nonce(t.from_):
+                        await db.execute(transaction_template, (block.hash, t.hash, t.to, t.from_, t.amount, t.timestamp, t.signature, t.nonce, t.fee))
+
+                    else:
+                        # revert block
+                        await db.execute('DELETE FROM "BLOCKS" WHERE "HASH" = ?', (block.hash,))
+                        await db.execute('DELETE FROM "TRANSACTIONS" WHERE "BLOCKHASH" = ?', (block.hash,))
+                        return False
+
                 for transaction in block[1:]:
                     for t in self.pending:
                         if t.hash == transaction.hash:
@@ -275,7 +290,8 @@ class Blockchain:
     async def add_transaction(self, transaction):
         """Wrapper around self.add_transaction that add a transactions to the mempool if it's valid."""
         if await self.verify_transaction(transaction):
-            self.pending.append(transaction)
+            if transaction.hash not in [t.hash for t in self.pending]:
+                self.pending.append(transaction)
             return True
 
         return False
