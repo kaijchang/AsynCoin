@@ -124,11 +124,8 @@ class Blockchain:
             acceptable_transactions = []
 
             for t in sorted(self.pending, key=lambda t: t.nonce):
-                if t.fee >= lowest_fee and t.nonce == await self.get_account_nonce(t.from_) + len([tr for tr in acceptable_transactions if tr.from_ == t.from_]):
+                if t.fee >= lowest_fee and t.nonce == await self.get_account_nonce(t.from_) + len([tr for tr in acceptable_transactions if tr.from_ == t.from_]) and t.amount + t.fee >= await self.get_balance(t.from_) - sum([tr.fee + tr.amount for tr in acceptable_transactions if tr.from_ == t.from_]):
                     acceptable_transactions.append(t)
-
-            acceptable_transactions = [
-                transaction for transaction in self.pending if transaction.fee >= lowest_fee]
 
             reward_transaction = Transaction(to=reward_address, from_='Network', amount=self.reward + sum(
                 transaction.fee for transaction in acceptable_transactions), nonce=0, fee=0)
