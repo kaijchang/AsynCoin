@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Blockchain Config</title>
+	<title>Wallet</title>
 
-    <!-- Favicon -->
+	<!-- Favicon -->
     <link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon">
   
     <!-- Bootstrap -->
@@ -12,21 +12,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
 
+    <!-- Stanford JS Crypto Library -->
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/sjcl.js" integrity="sha384-zJXJqc5ftX51ojskUi8aWFg0yrz9P61p6Wyg8n0cyFYsgWiAYtxnVWzh8d8BLcw0" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/bn.js" integrity="sha384-ta9jKLI/ABcAaw85AlNc4QNh03QNGwDLBbReJL85EqzdHlImAH7+MRAnG1xwEsTm" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/aes.js" integrity="sha384-6iUiE1QGUeGv4u73nY4kC0hbVbJVGQy6drEdZDucwGxDkjwsei3TRDP1i8ve6zDi" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/ecc.js" integrity="sha384-MxSwZPUJTkNjwI1+PTUd7DdpPcvbu9dhqFN+f66PTV3tEjk75YwnoYinkI5lpbwa" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/sha1.js" integrity="sha384-qb+nmruETsrMRUN4ZZgE9Rgx0A7M22W5HF7Px5WeZP5B7S7TwBXl2wTDDYvqFAMv" crossorigin="anonymous"></script>
+
     <!-- my scripts -->
-    <script src="scripts/config_page.js"></script>
+    <script src="scripts/wallet.js"></script>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+	<nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="#">AsynCoin</a>
         <ul class="navbar-nav">
             <li class="nav-item">
                 <a class="nav-link" href="index.html">Blocks</a>
             </li>
-            <li class="nav-item active">
-                <a class="nav-link" href="#">Configuration</a>
-            </li>
             <li class="nav-item">
-                <a class="nav-link" href="wallet.html">Wallet</a>
+                <a class="nav-link" href="config_page.html">Configuration</a>
+            </li>
+            <li class="nav-item active">
+                <a class="nav-link" href="#">Wallet</a>
             </li>
         </ul>
         <div class="input-group ml-auto" style="width: 500px;">
@@ -39,16 +46,16 @@
             </div>
         </div>
     </nav>
-    <div class="card ml-3" style="width: 24rem;">
-        <div class="card-header">Network Difficulty</div>
+    <div class="card ml-3" style="width: 63rem;">
+        <div class="card-header">Generate Keys</div>
         <ul class="list-group list-group-flush" id="difficulty">
-            <li class="list-group-item">Unable to Connect.</li>
-        </ul>
-    </div>
-    <div class="card ml-3 mt-3" style="width: 24rem;">
-        <div class="card-header">Block Reward</div>
-        <ul class="list-group list-group-flush" id="blockreward">
-            <li class="list-group-item">Unable to Connect.</li>
+            <li class="list-group-item" id="private">Private Key: </li>
+            <li class="list-group-item" id="address">Address: </li>  
+            <li class="list-group-item">
+                <form class="form-inline ml-3 mt-3" id="generatekeys">
+                    <button type="submit" class="btn btn-primary">Generate Keys</button>
+                </form>
+            </li>
         </ul>
     </div>
 </body>
