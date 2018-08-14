@@ -13,11 +13,28 @@ $(document).ready(function() {
             $("#node-uri").attr("value", myIP + ":8000");
         }
     }
+
     $("#generatekeys").submit(function(e) {
         var keys = sjcl.ecc.ecdsa.generateKeys(192);
 
         $("#private").text("Private Key: " + sjcl.codec.hex.fromBits(keys.sec.get()));
         $("#address").text("Address: " + sjcl.codec.hex.fromBits(keys.pub.get().x.concat(keys.pub.get().y)));
+
+        return false;
+    });
+
+    $("#checkbalance").submit(function(e) {
+        $.ajax({
+            url: "http://" + $("#node-uri").val() + "/balance/" + $("#balance_address").val(),
+            success: function(balance) {
+                $("#icon").attr("src", "images/success.png");
+                $("#balance").text("Balance: " + balance);
+            },
+            failure: function(xhr, status, error) {
+                $("#icon").attr("src", "images/failure.png");
+            }
+        })
+
         return false;
     });
 });

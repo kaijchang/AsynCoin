@@ -13,11 +13,11 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
 
     <!-- Stanford JS Crypto Library -->
-    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/sjcl.js" integrity="sha384-zJXJqc5ftX51ojskUi8aWFg0yrz9P61p6Wyg8n0cyFYsgWiAYtxnVWzh8d8BLcw0" crossorigin="anonymous"></script>
-    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/bn.js" integrity="sha384-ta9jKLI/ABcAaw85AlNc4QNh03QNGwDLBbReJL85EqzdHlImAH7+MRAnG1xwEsTm" crossorigin="anonymous"></script>
-    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/aes.js" integrity="sha384-6iUiE1QGUeGv4u73nY4kC0hbVbJVGQy6drEdZDucwGxDkjwsei3TRDP1i8ve6zDi" crossorigin="anonymous"></script>
-    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/ecc.js" integrity="sha384-MxSwZPUJTkNjwI1+PTUd7DdpPcvbu9dhqFN+f66PTV3tEjk75YwnoYinkI5lpbwa" crossorigin="anonymous"></script>
-    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/master/core/sha1.js" integrity="sha384-qb+nmruETsrMRUN4ZZgE9Rgx0A7M22W5HF7Px5WeZP5B7S7TwBXl2wTDDYvqFAMv" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/sjcl.js" integrity="sha384-zJXJqc5ftX51ojskUi8aWFg0yrz9P61p6Wyg8n0cyFYsgWiAYtxnVWzh8d8BLcw0" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/bn.js" integrity="sha384-ta9jKLI/ABcAaw85AlNc4QNh03QNGwDLBbReJL85EqzdHlImAH7+MRAnG1xwEsTm" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/aes.js" integrity="sha384-6iUiE1QGUeGv4u73nY4kC0hbVbJVGQy6drEdZDucwGxDkjwsei3TRDP1i8ve6zDi" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/ecc.js" integrity="sha384-MxSwZPUJTkNjwI1+PTUd7DdpPcvbu9dhqFN+f66PTV3tEjk75YwnoYinkI5lpbwa" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/sha1.js" integrity="sha384-qb+nmruETsrMRUN4ZZgE9Rgx0A7M22W5HF7Px5WeZP5B7S7TwBXl2wTDDYvqFAMv" crossorigin="anonymous"></script>
 
     <!-- my scripts -->
     <script src="scripts/wallet.js"></script>
@@ -25,15 +25,15 @@
 <body>
 	<nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="#">AsynCoin</a>
-        <ul class="navbar-nav">
+        <ul class="nav nav-tabs">
             <li class="nav-item">
                 <a class="nav-link" href="index.html">Blocks</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="config_page.html">Configuration</a>
             </li>
-            <li class="nav-item active">
-                <a class="nav-link" href="#">Wallet</a>
+            <li class="nav-item">
+                <a class="nav-link active" href="#">Wallet</a>
             </li>
         </ul>
         <div class="input-group ml-auto" style="width: 500px;">
@@ -48,12 +48,29 @@
     </nav>
     <div class="card ml-3" style="width: 63rem;">
         <div class="card-header">Generate Keys</div>
-        <ul class="list-group list-group-flush" id="difficulty">
+        <ul class="list-group list-group-flush">
             <li class="list-group-item" id="private">Private Key: </li>
             <li class="list-group-item" id="address">Address: </li>  
             <li class="list-group-item">
-                <form class="form-inline ml-3 mt-3" id="generatekeys">
+                <form class="form-inline ml-2 mt-1" id="generatekeys">
                     <button type="submit" class="btn btn-primary">Generate Keys</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+    <div class="card ml-3 mt-3" style="width: 63rem;">
+        <div class="card-header">Check Balance</div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item" id="balance">Balance: </li>
+            <li class="list-group-item">
+                <form class="form-inline ml-2 mt-1" id="checkbalance">
+                    <div class="input-group" style="width: 500px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon1">Address</span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Address" aria-label="Address" aria-describedby="basic-addon1" id="balance_address">
+                    </div>
+                    <button type="submit" class="btn btn-primary ml-2">Check Balance</button>
                 </form>
             </li>
         </ul>
