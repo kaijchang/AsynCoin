@@ -60,8 +60,8 @@ class Blockchain:
                             'INITIAL_REWARD': config_[3],
                             'INITIAL_DIFFICULTY': config_[4]}
 
-            self.reward = self.config_['INITIAL_REWARD'] / pow(2, c.execute(
-                'SELECT COUNT(*) FROM BLOCKS').fetchone()[0] / self.config_['REWARD_HALVING'])
+            self.reward = self.config_['INITIAL_REWARD'] / math.floor(pow(2, c.execute(
+                'SELECT COUNT(*) FROM BLOCKS').fetchone()[0] / self.config_['REWARD_HALVING']))
             self.difficulty = self.config_['INITIAL_DIFFICULTY']
             for x in range(math.floor(c.execute('SELECT COUNT(*) FROM BLOCKS').fetchone()[0] / self.config_['DIFFICULTY_ADJUST'])):
                 beginning_time = c.execute('SELECT TIMESTAMP FROM "BLOCKS" WHERE NUMBER = ?', (
