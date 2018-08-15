@@ -187,8 +187,9 @@ class Blockchain:
         ).exponent < 19 and decimal.Decimal(transaction.fee).as_tuple().exponent < 19
         address_check = len(transaction.to) == 96 and len(
             transaction.from_) == 96
+        positive_check = transaction.amount > 0 and transaction.fee > 0
 
-        return all((signature_check, balance_check, address_check))
+        return all((signature_check, balance_check, decimal_check, address_check, positive_check))
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
