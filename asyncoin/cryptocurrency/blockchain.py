@@ -188,8 +188,9 @@ class Blockchain:
         address_check = len(transaction.to) == 96 and len(
             transaction.from_) == 96
         positive_check = transaction.amount > 0 and transaction.fee > 0
+        self_check = transaction.from_ != transaction.to
 
-        return all((signature_check, balance_check, decimal_check, address_check, positive_check))
+        return all((signature_check, balance_check, decimal_check, address_check, positive_check, self_check))
 
     async def height(self):
         async with aiosqlite.connect(self.db) as db:
