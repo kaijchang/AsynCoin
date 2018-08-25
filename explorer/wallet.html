@@ -18,6 +18,7 @@
     <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/aes.js" integrity="sha384-6iUiE1QGUeGv4u73nY4kC0hbVbJVGQy6drEdZDucwGxDkjwsei3TRDP1i8ve6zDi" crossorigin="anonymous"></script>
     <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/ecc.js" integrity="sha384-MxSwZPUJTkNjwI1+PTUd7DdpPcvbu9dhqFN+f66PTV3tEjk75YwnoYinkI5lpbwa" crossorigin="anonymous"></script>
     <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/sha1.js" integrity="sha384-qb+nmruETsrMRUN4ZZgE9Rgx0A7M22W5HF7Px5WeZP5B7S7TwBXl2wTDDYvqFAMv" crossorigin="anonymous"></script>
+    <script src="https://cdn.rawgit.com/bitwiseshiftleft/sjcl/cc887b5/core/sha256.js" integrity="sha384-TDQH+BLcS+1kKkEMr0j5NwtoTkfv48zOKFdsVsCfq8m5TdJnFLjQQUlxD+PSWukT" crossorigin="anonymous"></script>
 
     <!-- my scripts -->
     <script src="scripts/wallet.js"></script>
@@ -64,13 +65,47 @@
             <li class="list-group-item" id="balance">Balance: </li>
             <li class="list-group-item">
                 <form class="form-inline ml-2 mt-1" id="checkbalance">
-                    <div class="input-group" style="width: 500px;">
+                    <div class="input-group" style="width: 600px;">
                         <div class="input-group-prepend">
                             <span class="input-group-text" id="basic-addon1">Address</span>
                         </div>
                         <input type="text" class="form-control" placeholder="Address" aria-label="Address" aria-describedby="basic-addon1" id="balance_address">
                     </div>
                     <button type="submit" class="btn btn-primary ml-2">Check Balance</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+    <div class="card ml-3 mt-3" style="width: 63rem;">
+        <div class="card-header">Send Transaction</div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+                <form class="form-inline ml-2 mt-1" id="sendtransaction">
+                    <div class="input-group mt-2" style="width: 600px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon1">Recipient</span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Recipient" aria-label="Recipient" aria-describedby="basic-addon1" id="recipient">
+                    </div>
+                    <div class="input-group mt-2" style="width: 600px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon1">Amount</span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Amount" aria-label="Amount" aria-describedby="basic-addon1" id="amount">
+                    </div>
+                    <div class="input-group mt-2" style="width: 600px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon1">Fee</span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Fee" aria-label="Fee" aria-describedby="basic-addon1" id="fee">
+                    </div>
+                    <div class="input-group mt-2" style="width: 600px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon1">Private Key</span>
+                        </div>
+                        <input type="text" class="form-control" placeholder="Private Key" aria-label="Private Key" aria-describedby="basic-addon1" id="privatekey">
+                    </div>
+                    <button type="submit" class="btn btn-primary ml-2 mt-2">Send Transaction</button>
                 </form>
             </li>
         </ul>

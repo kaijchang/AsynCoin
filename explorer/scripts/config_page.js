@@ -8,13 +8,11 @@ function connect(URL) {
 
             $("#icon").attr("src", "images/success.png");
 
+            $("#blockreward").empty();
+            $("#difficulty").empty();
+
             $.get("http://" + URL + "/height", function(height) {
                 var height = parseInt(height);
-
-                $("#icon").attr("src", "images/success.png");
-
-                $("#blockreward").empty();
-                $("#difficulty").empty();
 
                 $("#difficulty").append('<li class="list-group-item">' + config["DIFFICULTY_ADJUST"] + ' Blocks Between Difficulty Adjustments</li>');
                 $("#difficulty").append('<li class="list-group-item">' + (config["DIFFICULTY_ADJUST"] - height % config["DIFFICULTY_ADJUST"]) + ' Blocks Until Next Difficulty Adjustment</li>');

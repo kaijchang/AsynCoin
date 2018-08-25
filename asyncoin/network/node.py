@@ -114,6 +114,7 @@ class Node(Blockchain, Peers):
 
         @self.app.route('/transaction', methods=['POST'])
         async def transaction(request):
+            print(request.body)
             if request.body is None:
                 return response.json({'success': False}, headers={'Access-Control-Allow-Origin': '*'})
 
@@ -212,9 +213,9 @@ class Node(Blockchain, Peers):
 
     async def interface(self):
         """Asynchronous user input task."""
-        logging.getLogger('root').setLevel('CRITICAL')
-        logging.getLogger('sanic.error').setLevel('CRITICAL')
-        logging.getLogger('sanic.access').setLevel('CRITICAL')
+        #logging.getLogger('root').setLevel('CRITICAL')
+        #ogging.getLogger('sanic.error').setLevel('CRITICAL')
+        #logging.getLogger('sanic.access').setLevel('CRITICAL')
 
         loop = asyncio.get_event_loop()
 
