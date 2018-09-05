@@ -5,7 +5,7 @@ function connect(URL) {
     // pings node
     $.ajax({
         url: "http://" + URL + "/height",
-        success: function(height) {
+        success: height => {
             clearInterval(interval);
 
             var height = parseInt(height);
@@ -45,7 +45,7 @@ function connect(URL) {
 
             // subscribes to new blocks
             ws = new WebSocket("ws://" + URL + "/subscribeblock");
-            ws.onmessage = function(event) {
+            ws.onmessage = event => {
                 var block = JSON.parse(event.data);
                 $("#blocks").prepend(`<tr>
                                         <th scope="row">` + block.index + `</th>
@@ -60,7 +60,7 @@ function connect(URL) {
                 }
             }
 
-            ws.onclose = function(event) {
+            ws.onclose = event => {
                 ws = undefined;
                 $("#blocks").empty();
                 $("#blocks").append(`<tr>
@@ -70,12 +70,12 @@ function connect(URL) {
             }
 
         },
-        error: function(xhr, status, error) {
+        error: () => {
             clearInterval(interval);
 
             $("#icon").attr("src", "images/failure.png");
 
-            interval = setInterval(function() {
+            interval = setInterval(() => {
                 connect($("#node-uri").val())
             }, 10000);
 
@@ -93,14 +93,14 @@ $(document).ready(function() {
         iceServers: []
     });
     pc.createDataChannel(""); //create a bogus data channel
-    pc.createOffer(pc.setLocalDescription.bind(pc), function() {}); // create offer and set local description
-    pc.onicecandidate = function(ice) {
+    pc.createOffer(pc.setLocalDescription.bind(pc), () => {}); // create offer and set local description
+    pc.onicecandidate = ice => {
         if (ice && ice.candidate && ice.candidate.candidate) {
             var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
             pc.onicecandidate = function() {};
             connect(myIP + ":8000");
             $("#node-uri").attr("value", myIP + ":8000");
-            $("#node-uri").on("input", function() {
+            $("#node-uri").on("input", () => {
                 connect(this.value);
             });
         }

@@ -6,7 +6,7 @@ $(document).ready(function() {
     });
     pc.createDataChannel(''); //create a bogus data channel
     pc.createOffer(pc.setLocalDescription.bind(pc), function() {}); // create offer and set local description
-    pc.onicecandidate = function(ice) {
+    pc.onicecandidate = ice => {
         if (ice && ice.candidate && ice.candidate.candidate) {
             var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
             pc.onicecandidate = function() {};
@@ -14,7 +14,7 @@ $(document).ready(function() {
         }
     }
 
-    $("#generatekeys").submit(function(e) {
+    $("#generatekeys").submit(() => {
         var keys = sjcl.ecc.ecdsa.generateKeys(192);
 
         $("#private").text("Private Key: " + sjcl.codec.hex.fromBits(keys.sec.get()));
@@ -23,14 +23,14 @@ $(document).ready(function() {
         return false;
     });
 
-    $("#checkbalance").submit(function(e) {
+    $("#checkbalance").submit(() => {
         $.ajax({
             url: "http://" + $("#node-uri").val() + "/balance/" + $("#balance_address").val(),
-            success: function(balance) {
+            success: balance => {
                 $("#icon").attr("src", "images/success.png");
                 $("#balance").text("Balance: " + balance);
             },
-            error: function(xhr, status, error) {
+            error: () => {
                 $("#icon").attr("src", "images/failure.png");
             }
         })
@@ -38,7 +38,7 @@ $(document).ready(function() {
         return false;
     });
 
-    $("#sendtransaction").submit(function(e) {
+    $("#sendtransaction").submit(() => {
         if ($("#privatekey").val().length != 48) {
             $(".alert").remove();
             $("#sendtransaction").prepend(`<div class="alert alert-danger">
@@ -75,7 +75,7 @@ $(document).ready(function() {
             } else {
                 $.ajax({
                     url: "http://" + $("#node-uri").val() + "/balance/" + sjcl.codec.hex.fromBits(pub.get().x.concat(pub.get().y)),
-                    success: function(balance) {
+                    success: balance => {
                         $("#icon").attr("src", "images/success.png");
                         if (parseInt(balance) < parseInt($("#fee").val()) + parseInt($("#amount").val())) {
                             $(".alert").remove();
@@ -105,15 +105,12 @@ $(document).ready(function() {
                                         "signature": signature,
                                         "nonce": nonce,
                                         "fee": fee
-                                    }),
-                                    success: function(response) {
-
-                                    }
+                                    })
                                 });
                             });
                         }
                     },
-                    error: function(xhr, status, error) {
+                    error: () => {
                         $(".alert").remove();
                         $("#sendtransaction").prepend(`<div class="alert alert-danger">
                                         <strong>Error!</strong> Unable to connect to node.

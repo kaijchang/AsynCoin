@@ -3,7 +3,7 @@ var interval;
 function connect(URL) {
     $.ajax({
         url: "http://" + URL + "/config",
-        success: function(config) {
+        success: config => {
             clearInterval(interval);
 
             $("#icon").attr("src", "images/success.png");
@@ -26,7 +26,7 @@ function connect(URL) {
                 $("#difficulty").prepend('<li class="list-group-item">' + 16 ** difficulty + ' Hashes per Block</li>');
             });
         },
-        error: function(xhr, status, error) {
+        error: () => {
             clearInterval(interval);
 
             $('#icon').attr("src", "images/failure.png");
@@ -45,23 +45,23 @@ function connect(URL) {
 }
 
 
-$(document).ready(function() {
+$(document).ready(() => {
     // https://stackoverflow.com/questions/20194722/can-you-get-a-users-local-lan-ip-address-via-javascript
     window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection; //compatibility for Firefox and chrome
     var pc = new RTCPeerConnection({
         iceServers: []
     });
     pc.createDataChannel(''); //create a bogus data channel
-    pc.createOffer(pc.setLocalDescription.bind(pc), function() {}); // create offer and set local description
-    pc.onicecandidate = function(ice) {
+    pc.createOffer(pc.setLocalDescription.bind(pc), () => {}); // create offer and set local description
+    pc.onicecandidate = ice => {
         if (ice && ice.candidate && ice.candidate.candidate) {
             var myIP = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(ice.candidate.candidate)[1];
-            pc.onicecandidate = function() {};
+            pc.onicecandidate = () => {};
             connect(myIP + ":8000");
 
 
             $("#node-uri").attr("value", myIP + ":8000");
-            $("#node-uri").on("input", function() {
+            $("#node-uri").on("input", () => {
                 connect(this.value);
             });
         }
