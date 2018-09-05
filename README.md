@@ -1,5 +1,7 @@
 # AsynCoin
 
+[![Build Status](https://travis-ci.org/kajchang/AsynCoin.svg?branch=master)](https://travis-ci.org/kajchang/AsynCoin)
+
 AsynCoin is a very in-progress build of a basic implementation of a cryptocurrency and a blockchain using Python's [AsyncIO](https://docs.python.org/3/library/asyncio.html).
 
 ## Table of Contents
