@@ -15,7 +15,7 @@ from asyncoin.cryptocurrency.transaction import Transaction
 from asyncoin.cryptocurrency.block import Block
 from asyncoin.cryptocurrency.keys import Verifier
 
-with open(os.path.join(os.path.dirname(__file__), os.pardir, 'config/config.yaml')) as config_file:
+with open(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, 'config/config.yaml')) as config_file:
     config = yaml.load(config_file.read())
 
 with open(os.path.join(os.path.dirname(__file__), os.pardir, 'sql/startup.sql')) as script:

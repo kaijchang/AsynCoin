@@ -434,12 +434,12 @@ class Node(Blockchain, Peers):
             asyncio.get_event_loop().run_until_complete(self.sync(sync))
 
         elif not os.path.exists(self.db):
-            with open('./asyncoin/config/keys.yaml') as key_file:
+            with open('./config/keys.yaml') as key_file:
                 address = yaml.load(key_file.read())['address']
 
             if not address:
                 raise KeyError(
-                    "No address found in 'keys.yaml', use 'python3 run.py generate' not generate a pair.")
+                    "No address found in 'keys.yaml', use 'python3 run.py generate' to generate a pair.")
 
             Blockchain.__init__(
                 self, genesis_address=address, db=self.db)
